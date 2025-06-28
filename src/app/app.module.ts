@@ -18,7 +18,7 @@ import { getStorage } from 'firebase/storage';
 
 @NgModule({
   declarations: [AppComponent],
-  imports: [BrowserModule, IonicModule.forRoot(), AppRoutingModule, ],
+  imports: [BrowserModule, IonicModule.forRoot({mode: 'ios'}), AppRoutingModule, ],
   providers: [{ provide: RouteReuseStrategy, useClass: IonicRouteStrategy, },
     provideFirebaseApp(() => initializeApp(environment.firebaseConfig)),
     provideAuth(() => getAuth()),

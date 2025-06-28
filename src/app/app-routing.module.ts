@@ -21,12 +21,15 @@ const routes: Routes = [
     loadChildren: () => import('./home/home.module').then(m => m.HomePageModule),
     canActivate: [authGuard]
   },
-
-
+  {
+    path: 'veterinarios',
+    loadChildren: () => import('./pages/veterinarios/veterinarios.module').then( m => m.VeterinariosPageModule)
+  },
   {
     path: '**',
     redirectTo: 'login'
   },
+
 
 ];
 
