@@ -1,0 +1,57 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-title>Iniciar Sesión</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title class="ion-text-center">Bienvenido</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <form [formGroup]="loginForm" (ngSubmit)="login()">
+        <ion-item>
+          <ion-label position="floating">Correo electrónico</ion-label>
+          <ion-input type="email" formControlName="email" required></ion-input>
+        </ion-item>
+        <div class="ion-padding-start" *ngIf="loginForm.get('email')?.touched && loginForm.get('email')?.errors?.['required']">
+          <span class="error-message">El correo es obligatorio</span>
+        </div>
+        <div class="ion-padding-start" *ngIf="loginForm.get('email')?.touched && loginForm.get('email')?.errors?.['email']">
+          <span class="error-message">Por favor, ingresa un correo válido</span>
+        </div>
+
+        <ion-item>
+          <ion-label position="floating">Contraseña</ion-label>
+          <ion-input type="password" formControlName="password" required></ion-input>
+        </ion-item>
+        <div class="ion-padding-start" *ngIf="loginForm.get('password')?.touched && loginForm.get('password')?.errors?.['required']">
+          <span class="error-message">La contraseña es obligatoria</span>
+        </div>
+        <div class="ion-padding-start" *ngIf="loginForm.get('password')?.touched && loginForm.get('password')?.errors?.['minlength']">
+          <span class="error-message">La contraseña debe tener al menos 6 caracteres</span>
+        </div>
+
+        <div class="ion-padding">
+          <ion-button expand="block" type="submit" [disabled]="!loginForm.valid">
+            Iniciar Sesión
+          </ion-button>
+        </div>
+      </form>
+
+      <div class="ion-text-center">
+        <ion-button fill="clear" size="small" (click)="forgotPassword()">
+          ¿Olvidaste tu contraseña?
+        </ion-button>
+      </div>
+
+      <div class="ion-text-center ion-padding-top">
+        <p>¿No tienes una cuenta?</p>
+        <ion-button fill="clear" (click)="goToRegister()">
+          Regístrate aquí
+        </ion-button>
+      </div>
+    </ion-card-content>
+  </ion-card>
+</ion-content>

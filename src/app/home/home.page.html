@@ -1,0 +1,317 @@
+<ion-menu contentId="main-content" menuId="main-menu">
+  <ion-header>
+    <ion-toolbar color="primary">
+      <ion-title>Menú</ion-title>
+    </ion-toolbar>
+  </ion-header>
+
+  <ion-content>
+    <ion-list>
+      <!-- Información del usuario -->
+      <ion-item>
+        <ion-avatar slot="start">
+          <ion-icon name="person-circle-outline" size="large"></ion-icon>
+        </ion-avatar>
+        <ion-label>
+          <h2>{{ getUserDisplayName() }}</h2>
+          <p>{{ userEmail }}</p>
+          <ion-chip *ngIf="userRole" color="secondary">
+            <ion-label>{{ userRole }}</ion-label>
+          </ion-chip>
+        </ion-label>
+      </ion-item>
+
+      <!-- Navegación de la app de mascotas -->
+      <ion-item button routerLink="/perfil" routerDirection="forward">
+        <ion-icon name="person-outline" slot="start"></ion-icon>
+        <ion-label>Perfil</ion-label>
+      </ion-item>
+
+      <ion-item button routerLink="/petfile" routerDirection="forward">
+        <ion-icon name="paw-outline" slot="start"></ion-icon>
+        <ion-label>Ficha Mascota</ion-label>
+      </ion-item>
+
+      <ion-item button routerLink="/calendar" routerDirection="forward">
+        <ion-icon name="calendar-outline" slot="start"></ion-icon>
+        <ion-label>Calendario</ion-label>
+      </ion-item>
+
+      <ion-item button routerLink="/veterinarios" routerDirection="forward">
+        <ion-icon name="medical-outline" slot="start"></ion-icon>
+        <ion-label>Veterinarios</ion-label>
+      </ion-item>
+
+      <ion-item button routerLink="/chatbot" routerDirection="forward">
+        <ion-icon name="chatbubbles-outline" slot="start"></ion-icon>
+        <ion-label>Chatbot</ion-label>
+      </ion-item>
+
+      <ion-item button routerLink="/gestion-mascota" routerDirection="forward">
+        <ion-icon name="paw-outline" slot="start"></ion-icon>
+        <ion-label>Gestion Macotas</ion-label>
+      </ion-item>
+
+      <!-- Cerrar sesión -->
+      <ion-item button (click)="logout()">
+        <ion-icon name="log-out-outline" slot="start"></ion-icon>
+        <ion-label>Cerrar Sesión</ion-label>
+      </ion-item>
+    </ion-list>
+  </ion-content>
+</ion-menu>
+
+<!-- Contenido principal -->
+<div class="ion-page" id="main-content">
+  <ion-header [translucent]="true">
+    <ion-toolbar color="primary">
+      <ion-buttons slot="start">
+        <ion-menu-button></ion-menu-button>
+      </ion-buttons>
+      <ion-title>
+        {{ getGreeting() }}, {{ getUserName() }}!
+      </ion-title>
+    </ion-toolbar>
+  </ion-header>
+
+  <ion-content [fullscreen]="true" class="ion-padding">
+    <!-- Header con saludo -->
+    <ion-header collapse="condense">
+      <ion-toolbar>
+        <ion-title size="large">Comunidad de Mascotas</ion-title>
+      </ion-toolbar>
+    </ion-header>
+
+    <!-- Navegación rápida a secciones principales -->
+    <ion-card>
+      <ion-card-header>
+        <ion-card-title>Acceso Rápido</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <ion-grid>
+          <ion-row>
+            <ion-col size="6">
+              <ion-button expand="block" fill="outline" routerLink="/petfile">
+                <ion-icon name="paw-outline" slot="start"></ion-icon>
+                Mi Mascota
+              </ion-button>
+            </ion-col>
+            <ion-col size="6">
+              <ion-button expand="block" fill="outline" routerLink="/calendar">
+                <ion-icon name="calendar-outline" slot="start"></ion-icon>
+                Calendario
+              </ion-button>
+            </ion-col>
+            <ion-col size="6">
+              <ion-button expand="block" fill="outline" routerLink="/veterinarios">
+                <ion-icon name="medical-outline" slot="start"></ion-icon>
+                Veterinarios
+              </ion-button>
+            </ion-col>
+            <ion-col size="6">
+              <ion-button expand="block" fill="outline" routerLink="/chatbot">
+                <ion-icon name="chatbubbles-outline" slot="start"></ion-icon>
+                Chatbot
+              </ion-button>
+            </ion-col>
+          </ion-row>
+        </ion-grid>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Formulario para crear nueva publicación -->
+    <ion-card>
+      <ion-card-header>
+        <ion-card-title>¿Qué hace tu mascota hoy?</ion-card-title>
+        <ion-card-subtitle>Comparte momentos especiales con la comunidad</ion-card-subtitle>
+      </ion-card-header>
+      <ion-card-content>
+        <ion-textarea [(ngModel)]="newPostContent" placeholder="Cuéntanos sobre tu mascota..." rows="3" maxlength="500"
+          counter="true">
+        </ion-textarea>
+
+        <!-- Preview de imagen seleccionada -->
+        <div *ngIf="selectedImagePreview" class="image-preview">
+          <ion-img [src]="selectedImagePreview" alt="Imagen seleccionada"></ion-img>
+          <ion-button fill="clear" color="danger" (click)="removeSelectedImage()" class="remove-image-btn">
+            <ion-icon name="close-outline"></ion-icon>
+          </ion-button>
+        </div>
+
+        <!-- Botones de acción -->
+        <div class="post-actions">
+          <ion-button fill="outline" (click)="selectImage()" [disabled]="isLoading">
+            <ion-icon name="camera-outline" slot="start"></ion-icon>
+            Foto
+          </ion-button>
+
+          <ion-button (click)="createPost()" [disabled]="isLoading || (!newPostContent.trim() && !selectedImage)"
+            color="primary">
+            <ion-icon *ngIf="!isLoading" name="send" slot="start"></ion-icon>
+            <ion-icon *ngIf="isLoading" name="sync" slot="start" class="spinning"></ion-icon>
+            {{ isLoading ? 'Publicando...' : 'Compartir' }}
+          </ion-button>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Lista de publicaciones -->
+    <div *ngIf="posts$ | async as posts; else noPosts">
+      <ion-card *ngFor="let post of posts; trackBy: trackByPostId" class="post-card">
+        <!-- Header del post -->
+        <ion-card-header>
+          <div class="post-header">
+            <div class="user-info">
+              <ion-avatar>
+                <ion-icon name="person-circle-outline"></ion-icon>
+              </ion-avatar>
+              <div class="user-details">
+                <ion-card-title>{{ post.userName }}</ion-card-title>
+                <ion-card-subtitle>{{ formatTime(post.timestamp) }}</ion-card-subtitle>
+              </div>
+            </div>
+
+            <!-- Opciones del post (solo para posts propios) -->
+            <ion-button *ngIf="isUserPost(post)" fill="clear" (click)="showPostOptions(post)">
+              <ion-icon name="ellipsis-vertical-outline"></ion-icon>
+            </ion-button>
+          </div>
+        </ion-card-header>
+
+        <!-- Contenido del post -->
+        <ion-card-content>
+          <p *ngIf="post.content" class="post-content">{{ post.content }}</p>
+          <ion-img *ngIf="post.imageUrl" [src]="post.imageUrl" alt="Imagen del post" class="post-image">
+          </ion-img>
+        </ion-card-content>
+
+        <!-- Acciones del post -->
+        <div class="post-actions-bar">
+          <ion-button fill="clear" (click)="toggleLike(post.id!)" [color]="hasUserLiked(post) ? 'danger' : 'medium'">
+            <ion-icon [name]="hasUserLiked(post) ? 'heart' : 'heart-outline'" slot="start">
+            </ion-icon>
+            {{ post.likes?.length || 0 }} Me gusta
+          </ion-button>
+
+          <ion-button fill="clear" color="medium" (click)="showComments(post)">
+            <ion-icon name="chatbubble-outline" slot="start"></ion-icon>
+            {{ post.commentsCount || 0 }} Comentarios
+          </ion-button>
+        </div>
+      </ion-card>
+    </div>
+
+    <!-- Mensaje cuando no hay publicaciones -->
+    <ng-template #noPosts>
+      <ion-card class="empty-state">
+        <ion-card-content class="ion-text-center">
+          <ion-icon name="paw-outline" size="large" color="medium"></ion-icon>
+          <h2>¡Bienvenido a la comunidad de mascotas!</h2>
+          <p>No hay publicaciones aún. ¡Sé el primero en compartir algo sobre tu mascota!</p>
+          <ion-button (click)="focusTextarea()" color="primary">
+            Crear mi primera publicación
+          </ion-button>
+        </ion-card-content>
+      </ion-card>
+    </ng-template>
+
+    <ion-fab vertical="bottom" horizontal="end" slot="fixed">
+      <ion-fab-button color="primary" (click)="focusTextarea()">
+        <ion-icon name="add"></ion-icon>
+      </ion-fab-button>
+    </ion-fab>
+  </ion-content>
+</div>
+
+<style>
+  .post-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+  }
+
+  .image-preview {
+    position: relative;
+    margin: 12px 0;
+  }
+
+  .image-preview ion-img {
+    max-height: 200px;
+    border-radius: 8px;
+  }
+
+  .remove-image-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    --background: rgba(255, 255, 255, 0.9);
+    --border-radius: 50%;
+    width: 32px;
+    height: 32px;
+  }
+
+  .post-card {
+    margin-bottom: 16px;
+  }
+
+  .post-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .user-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .user-details {
+    flex: 1;
+  }
+
+  .post-content {
+    margin: 0 0 12px 0;
+    line-height: 1.4;
+  }
+
+  .post-image {
+    border-radius: 8px;
+    margin-top: 8px;
+  }
+
+  .post-actions-bar {
+    display: flex;
+    gap: 8px;
+    padding: 8px 16px;
+    border-top: 1px solid var(--ion-color-light);
+    margin: 12px -16px -16px -16px;
+  }
+
+  .empty-state {
+    margin-top: 40px;
+  }
+
+  .spinning {
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  ion-grid {
+    padding: 0;
+  }
+
+  ion-col {
+    padding: 4px;
+  }
+</style>
