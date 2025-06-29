@@ -1,0 +1,266 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/home"></ion-back-button>
+    </ion-buttons>
+
+    <ion-title>Mis Mascotas</ion-title>
+    <ion-buttons slot="end">
+      <ion-button *ngIf="!showPetDetail" (click)="openPetForm()">
+        <ion-icon slot="icon-only" name="add"></ion-icon>
+      </ion-button>
+      <ion-button *ngIf="showPetDetail" (click)="closePetDetail()">
+        <ion-icon slot="icon-only" name="close"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <!-- Lista de Mascotas (Vista principal) -->
+  <div *ngIf="!showPetDetail && petForm.pristine">
+    <div class="empty-state" *ngIf="pets.length === 0">
+      <ion-icon name="paw"></ion-icon>
+      <h2>No tienes mascotas registradas</h2>
+      <p>¡Agrega tu primera mascota haciendo clic en el botón +!</p>
+    </div>
+
+    <ion-grid *ngIf="pets.length > 0">
+      <ion-row>
+        <ion-col size="6" *ngFor="let pet of pets">
+          <ion-card (click)="viewPetDetail(pet)">
+            <div class="pet-image-container">
+              <img *ngIf="pet.photoUrl" [src]="pet.photoUrl" alt="{{pet.name}}">
+              <ion-icon *ngIf="!pet.photoUrl" name="paw" class="default-pet-image"></ion-icon>
+            </div>
+            <ion-card-header>
+              <ion-card-title>{{pet.name}}</ion-card-title>
+              <ion-card-subtitle *ngIf="pet.nickname">{{pet.nickname}}</ion-card-subtitle>
+            </ion-card-header>
+            <ion-card-content>
+              <p>{{getSpeciesName(pet.species)}}</p>
+              <p>{{getBreedName(pet.breed)}}</p>
+              <p>{{pet.age}} años</p>
+            </ion-card-content>
+          </ion-card>
+        </ion-col>
+      </ion-row>
+    </ion-grid>
+  </div>
+
+  <!-- Detalle de Mascota -->
+  <div *ngIf="showPetDetail && selectedPet">
+    <ion-card>
+      <div class="pet-detail-image">
+        <img *ngIf="selectedPet.photoUrl" [src]="selectedPet.photoUrl" alt="{{selectedPet.name}}">
+        <ion-icon *ngIf="!selectedPet.photoUrl" name="paw" class="default-pet-image-detail"></ion-icon>
+      </div>
+
+      <ion-card-header>
+        <ion-card-title>{{selectedPet.name}}</ion-card-title>
+        <ion-card-subtitle *ngIf="selectedPet.nickname">{{selectedPet.nickname}}</ion-card-subtitle>
+      </ion-card-header>
+
+      <ion-card-content>
+        <ion-list>
+          <ion-item>
+            <ion-label>Especie</ion-label>
+            <ion-note slot="end">{{getSpeciesName(selectedPet.species)}}</ion-note>
+          </ion-item>
+          <ion-item>
+            <ion-label>Raza</ion-label>
+            <ion-note slot="end">{{getBreedName(selectedPet.breed)}}</ion-note>
+          </ion-item>
+          <ion-item>
+            <ion-label>Edad</ion-label>
+            <ion-note slot="end">{{selectedPet.age}} años</ion-note>
+          </ion-item>
+          <ion-item>
+            <ion-label>Peso</ion-label>
+            <ion-note slot="end">{{selectedPet.weight}} kg</ion-note>
+          </ion-item>
+          <ion-item *ngIf="selectedPet.chipId">
+            <ion-label>Nº de Chip</ion-label>
+            <ion-note slot="end">{{selectedPet.chipId}}</ion-note>
+          </ion-item>
+        </ion-list>
+
+        <div class="action-buttons">
+          <ion-button expand="block" (click)="openPetForm(selectedPet)">
+            <ion-icon name="create" slot="start"></ion-icon>
+            Editar
+          </ion-button>
+          <ion-button expand="block" color="danger" (click)="deletePet(selectedPet)">
+            <ion-icon name="trash" slot="start"></ion-icon>
+            Eliminar
+          </ion-button>
+        </div>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
+  <!-- Formulario para Crear/Editar Mascota -->
+  <form [formGroup]="petForm" (ngSubmit)="submitForm()" *ngIf="!petForm.pristine">
+    <ion-item>
+      <ion-label position="floating">Nombre *</ion-label>
+      <ion-input formControlName="name" type="text" required></ion-input>
+    </ion-item>
+    <ion-note color="danger" *ngIf="petForm.get('name')?.invalid && petForm.get('name')?.touched">
+      El nombre es obligatorio
+    </ion-note>
+
+    <ion-item>
+      <ion-label position="floating">Apodo</ion-label>
+      <ion-input formControlName="nickname" type="text"></ion-input>
+    </ion-item>
+
+    <ion-item>
+      <ion-label position="floating">Edad (años) *</ion-label>
+      <ion-input formControlName="age" type="number" required></ion-input>
+    </ion-item>
+    <ion-note color="danger" *ngIf="petForm.get('age')?.invalid && petForm.get('age')?.touched">
+      La edad debe ser entre 0 y 30 años
+    </ion-note>
+
+    <ion-item>
+      <ion-label>Especie *</ion-label>
+      <ion-select formControlName="species" interface="action-sheet" placeholder="Seleccionar especie"
+        (ionChange)="filterBreedsBySpecies($event.detail.value)" required>
+        <ion-select-option *ngFor="let specie of species" [value]="specie.id">
+          {{specie.name}}
+        </ion-select-option>
+      </ion-select>
+    </ion-item>
+    <ion-note color="danger" *ngIf="petForm.get('species')?.invalid && petForm.get('species')?.touched">
+      La especie es obligatoria
+    </ion-note>
+
+    <ion-item>
+      <ion-label>Raza *</ion-label>
+      <ion-select formControlName="breed" interface="action-sheet" placeholder="Seleccionar raza" required
+        [disabled]="!petForm.get('species')?.value">
+        <ion-select-option *ngFor="let breed of filteredBreeds" [value]="breed.id">
+          {{breed.name}}
+        </ion-select-option>
+      </ion-select>
+    </ion-item>
+    <ion-note color="danger" *ngIf="petForm.get('breed')?.invalid && petForm.get('breed')?.touched">
+      La raza es obligatoria
+    </ion-note>
+
+    <ion-item>
+      <ion-label position="floating">Peso (kg) *</ion-label>
+      <ion-input formControlName="weight" type="number" required></ion-input>
+    </ion-item>
+    <ion-note color="danger" *ngIf="petForm.get('weight')?.invalid && petForm.get('weight')?.touched">
+      El peso debe ser entre 0 y 100 kg
+    </ion-note>
+
+    <ion-item>
+      <ion-label position="floating">Nº de Chip</ion-label>
+      <ion-input formControlName="chipId" type="text"></ion-input>
+    </ion-item>
+
+    <div class="photo-container">
+      <div class="photo-preview" (click)="takePicture()">
+        <img *ngIf="selectedPhoto" [src]="selectedPhoto" alt="Pet Photo">
+        <div *ngIf="!selectedPhoto" class="photo-placeholder">
+          <ion-icon name="camera"></ion-icon>
+          <p>Toca para agregar foto</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-buttons">
+      <ion-button expand="block" type="submit" [disabled]="petForm.invalid">
+        {{ isEditing ? 'Actualizar' : 'Guardar' }}
+      </ion-button>
+      <ion-button expand="block" fill="outline" type="button" (click)="petForm.reset(); petForm.markAsPristine()">
+        Cancelar
+      </ion-button>
+    </div>
+  </form>
+
+
+  <ion-modal [isOpen]="showSpeciesBreedModal" (didDismiss)="closeSpeciesBreedModal()">
+    <ng-template>
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>{{ isAddingSpecies ? 'Nueva Especie' : 'Nueva Raza' }}</ion-title>
+          <ion-buttons slot="end">
+            <ion-button (click)="closeSpeciesBreedModal()">
+              <ion-icon slot="icon-only" name="close"></ion-icon>
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+
+      <ion-content class="ion-padding">
+        <form [formGroup]="speciesBreedForm" (ngSubmit)="saveSpeciesOrBreed()">
+          <ion-item *ngIf="!isAddingSpecies">
+            <ion-label>Especie</ion-label>
+            <ion-select formControlName="speciesId" interface="action-sheet" placeholder="Seleccionar especie" required>
+              <ion-select-option *ngFor="let specie of species" [value]="specie.id">
+                {{specie.name}}
+              </ion-select-option>
+            </ion-select>
+          </ion-item>
+
+          <ion-item>
+            <ion-label position="floating">{{ isAddingSpecies ? 'Nombre de la especie' : 'Nombre de la raza' }}
+              *</ion-label>
+            <ion-input formControlName="name" type="text" required></ion-input>
+          </ion-item>
+          <ion-note color="danger"
+            *ngIf="speciesBreedForm.get('name')?.invalid && speciesBreedForm.get('name')?.touched">
+            El nombre es obligatorio
+          </ion-note>
+
+          <div class="form-buttons">
+            <ion-button expand="block" type="submit" [disabled]="speciesBreedForm.invalid">
+              Guardar
+            </ion-button>
+            <ion-button expand="block" fill="outline" type="button" (click)="closeSpeciesBreedModal()">
+              Cancelar
+            </ion-button>
+          </div>
+        </form>
+
+        <ion-list *ngIf="isAddingSpecies && species.length > 0">
+          <ion-list-header>
+            <ion-label>Especies existentes</ion-label>
+          </ion-list-header>
+          <ion-item *ngFor="let specie of species">
+            <ion-label>{{specie.name}}</ion-label>
+          </ion-item>
+        </ion-list>
+
+        <ion-list *ngIf="!isAddingSpecies && breeds.length > 0">
+          <ion-list-header>
+            <ion-label>Razas existentes</ion-label>
+          </ion-list-header>
+          <ion-item *ngFor="let breed of breeds">
+            <ion-label>{{breed.name}} ({{getSpeciesName(breed.speciesId)}})</ion-label>
+          </ion-item>
+        </ion-list>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
+
+  <!-- Botones flotantes para agregar especies/razas -->
+  <ion-fab vertical="bottom" horizontal="end" slot="fixed" *ngIf="petForm.pristine">
+    <ion-fab-button>
+      <ion-icon name="paw"></ion-icon>
+    </ion-fab-button>
+    <ion-fab-list side="top">
+      <ion-fab-button (click)="openSpeciesBreedModal(true)">
+        <ion-icon name="add"></ion-icon>
+        <ion-label>Especie</ion-label>
+      </ion-fab-button>
+      <ion-fab-button (click)="openSpeciesBreedModal(false)">
+        <ion-icon name="add"></ion-icon>
+        <ion-label>Raza</ion-label>
+      </ion-fab-button>
+    </ion-fab-list>
+  </ion-fab>
+</ion-content>

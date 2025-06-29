@@ -25,10 +25,15 @@ const routes: Routes = [
     path: 'veterinarios',
     loadChildren: () => import('./pages/veterinarios/veterinarios.module').then( m => m.VeterinariosPageModule)
   },
+    {
+    path: 'petfile',
+    loadChildren: () => import('./pages/petfile/petfile.module').then( m => m.PetfilePageModule)
+  },
   {
     path: '**',
     redirectTo: 'login'
   },
+
 
 
 ];
