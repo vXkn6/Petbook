@@ -26,7 +26,7 @@ export class VeterinariosPage {
     this.loadVeterinarios();
 
   }
-  
+
   userEmail: string | null = null;
   userRole: string | null = null;
   userName: string | null = null;
@@ -34,6 +34,11 @@ export class VeterinariosPage {
   private authService = inject(AutheticationService);
 
   diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes',];
+  horariosDisponibles: string[] = [
+    '08:00', '09:00', '10:00', '11:00',
+    '12:00', '13:00', '14:00', '15:00',
+    '16:00', '17:00', '18:00'
+  ];
   diaSeleccionado: string = this.diasSemana[0]; // Día inicial seleccionado
   veterinariosFiltrados: any[] = []
 
@@ -51,6 +56,7 @@ export class VeterinariosPage {
     especialidad: '',
     foto: '',
     diasLaborales: [],
+    horariosLaborales: {},
     disponible: true
   };
 
@@ -149,14 +155,21 @@ export class VeterinariosPage {
   }
 
   async agregarVeterinario() {
-    // Convierte días laborales a array
+    // Convertir días y horarios laborales
     const diasArray = this.diasSemana.filter(dia =>
       this.nuevoVeterinario.diasLaborales[dia]
     );
 
+    // Crear objeto de horarios para cada día
+    const horariosObj: any = {};
+    diasArray.forEach(dia => {
+      horariosObj[dia] = this.nuevoVeterinario.horariosLaborales[dia] || [];
+    });
+
     const veterinarioParaGuardar = {
       ...this.nuevoVeterinario,
-      diasLaborales: diasArray
+      diasLaborales: diasArray,
+      horariosLaborales: horariosObj
     };
 
     const veterinariosRef = collection(this.firestore, 'veterinarios');
@@ -168,10 +181,19 @@ export class VeterinariosPage {
   async actualizarVeterinario() {
     if (!this.editingId) return;
 
-    // Convierte los días laborales a array si es necesario
+    // Convertir días y horarios laborales
+    const diasArray = this.convertirDiasLaborales(this.nuevoVeterinario.diasLaborales);
+
+    // Crear objeto de horarios para cada día
+    const horariosObj: any = {};
+    diasArray.forEach(dia => {
+      horariosObj[dia] = this.nuevoVeterinario.horariosLaborales[dia] || [];
+    });
+
     const veterinarioParaActualizar = {
       ...this.nuevoVeterinario,
-      diasLaborales: this.convertirDiasLaborales(this.nuevoVeterinario.diasLaborales)
+      diasLaborales: diasArray,
+      horariosLaborales: horariosObj
     };
 
     const veterinarioRef = doc(this.firestore, 'veterinarios', this.editingId);
@@ -180,6 +202,7 @@ export class VeterinariosPage {
     this.resetForm();
     this.isModalOpen = false;
   }
+
   private convertirDiasLaborales(dias: any): string[] {
     if (Array.isArray(dias)) {
       return dias;
@@ -234,6 +257,7 @@ export class VeterinariosPage {
 
     await alert.present();
   }
+
   editarVeterinario(veterinario: any) {
     this.editMode = true;
     this.editingId = veterinario.id;
@@ -246,6 +270,7 @@ export class VeterinariosPage {
       especialidad: '',
       foto: '',
       diasLaborales: [],
+      horariosLaborales: {}, // Nuevo campo
       disponible: true
     };
     this.editMode = false;
@@ -290,7 +315,8 @@ export class VeterinariosPage {
     this.editingId = veterinario.id;
     this.nuevoVeterinario = {
       ...veterinario,
-      diasLaborales: this.convertirObjetoDias(veterinario.diasLaborales)
+      diasLaborales: this.convertirObjetoDias(veterinario.diasLaborales),
+      horariosLaborales: veterinario.horariosLaborales || {}
     };
     this.isModalOpen = true;
   }

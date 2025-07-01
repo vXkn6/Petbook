@@ -3,8 +3,8 @@
     <ion-buttons slot="start">
       <ion-back-button defaultHref="/home"></ion-back-button>
     </ion-buttons>
-    <ion-title *ngIf="userRole === 'owner'" >Veterinarios</ion-title>
-    <ion-title *ngIf="userRole === 'admin'" >Gestion de Veterinarios</ion-title>
+    <ion-title *ngIf="userRole === 'owner'">Veterinarios</ion-title>
+    <ion-title *ngIf="userRole === 'admin'">Gestion de Veterinarios</ion-title>
   </ion-toolbar>
 </ion-header>
 
@@ -23,15 +23,15 @@
     <!-- Mensaje cuando no hay veterinarios para el día seleccionado -->
 
     <div *ngIf="veterinariosFiltrados.length === 0" class="empty-state ion-text-center ion-padding">
-      <ion-icon name="paw" color="medium" size="large" *ngIf="userRole === 'admin'"></ion-icon >
+      <ion-icon name="paw" color="medium" size="large" *ngIf="userRole === 'admin'"></ion-icon>
       <ion-text color="medium" *ngIf="userRole === 'admin'">
         <h3>No hay veterinarios trabajando el {{ diaSeleccionado }}</h3>
         <p>Selecciona otro día o agrega un nuevo veterinario</p>
       </ion-text>
     </div>
-    
+
     <div *ngIf="veterinariosFiltrados.length === 0" class="empty-state ion-text-center ion-padding">
-      <ion-icon name="paw" color="medium" size="large" *ngIf="userRole === 'owner'" ></ion-icon>
+      <ion-icon name="paw" color="medium" size="large" *ngIf="userRole === 'owner'"></ion-icon>
       <ion-text color="medium" *ngIf="userRole === 'owner'">
         <h3>No hay veterinarios trabajando el {{ diaSeleccionado }}</h3>
         <p>Selecciona otro día</p>
@@ -59,7 +59,7 @@
             (ionChange)="actualizarDisponibilidad(vet.id, $event.detail.checked)"
             *ngIf="userRole === 'admin'"></ion-toggle>
         </ion-item>
-        <ion-item-options side="end" *ngIf="userRole === 'admin'">
+        <ion-item-options side="end">
           <ion-item-option color="warning" (click)="abrirModalEdicion(vet)">
             <ion-icon name="pencil" slot="icon-only"></ion-icon>
           </ion-item-option>
@@ -152,6 +152,22 @@
             <ion-checkbox slot="end" [(ngModel)]="nuevoVeterinario.diasLaborales[dia]"
               [ngModelOptions]="{standalone: true}"></ion-checkbox>
           </ion-item>
+          <!-- Horarios laborales por día -->
+          <ion-list *ngFor="let dia of diasSemana">
+            <ion-list-header *ngIf="nuevoVeterinario.diasLaborales[dia]">
+              <ion-label>Horarios para {{dia}}</ion-label>
+            </ion-list-header>
+
+            <ion-item *ngIf="nuevoVeterinario.diasLaborales[dia]">
+              <ion-select multiple="true" aria-label="Horarios" interface="action-sheet"
+                placeholder="Seleccionar horarios" [(ngModel)]="nuevoVeterinario.horariosLaborales[dia]"
+                [ngModelOptions]="{standalone: true}">
+                <ion-select-option *ngFor="let hora of horariosDisponibles" [value]="hora">
+                  {{ hora }}
+                </ion-select-option>
+              </ion-select>
+            </ion-item>
+          </ion-list>
 
           <!-- Disponibilidad -->
 

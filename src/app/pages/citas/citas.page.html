@@ -1,0 +1,66 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/home"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Nueva Cita Médica</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <form (ngSubmit)="crearCita()">
+    <!-- Selección de Veterinario -->
+    <ion-item>
+      <ion-select aria-label="Veterinario" interface="action-sheet" placeholder="Seleccionar veterinario"
+        [(ngModel)]="nuevaCita.veterinarioId" name="veterinario" required (ionChange)="cargarHorariosDisponibles()">
+        <ion-select-option *ngFor="let vet of veterinariosDisponibles" [value]="vet.id">
+          {{ vet.nombre }} ({{ vet.especialidad }})
+        </ion-select-option>
+      </ion-select>
+    </ion-item>
+
+    <!-- Fecha de la cita -->
+    <ion-item>
+      <ion-label position="stacked">Fecha</ion-label>
+      <ion-datetime presentation="date" [(ngModel)]="fechaSeleccionada" name="fecha" required [min]="fechaMinima"
+        [max]="fechaMaxima" (ionChange)="actualizarFechaCita($event)">
+      </ion-datetime>
+    </ion-item>
+
+    <!-- Hora de la cita -->
+    <ion-item>
+      <ion-select aria-label="Hora" interface="action-sheet" placeholder="Seleccionar hora" [(ngModel)]="nuevaCita.hora"
+        name="hora" required [disabled]="!horariosDisponibles.length">
+        <ion-select-option *ngFor="let hora of horariosDisponibles" [value]="hora">
+          {{ hora }}
+        </ion-select-option>
+      </ion-select>
+    </ion-item>
+
+    <!-- Motivo de la cita -->
+    <ion-item>
+      <ion-textarea label="Motivo de la cita" labelPlacement="stacked" placeholder="Describa el motivo de la cita"
+        [(ngModel)]="nuevaCita.motivo" name="motivo" required rows="4">
+      </ion-textarea>
+    </ion-item>
+
+    <!-- Mascota -->
+    <ion-item *ngIf="mascotas && mascotas.length > 0">
+      <ion-select aria-label="Mascota" interface="action-sheet" placeholder="Seleccionar mascota"
+        [(ngModel)]="nuevaCita.petId" name="mascota">
+        <ion-select-option *ngFor="let mascota of mascotas" [value]="mascota.id">
+          {{ mascota.nombre }} ({{ mascota.tipo }})
+        </ion-select-option>
+      </ion-select>
+    </ion-item>
+
+    <!-- Botón de guardar -->
+    <ion-button expand="block" type="submit" [disabled]="!formularioValido()" class="ion-margin-top">
+      <ion-icon slot="start" name="calendar"></ion-icon>
+      Agendar Cita
+    </ion-button>
+  </form>
+
+  <ion-toast [isOpen]="mostrarExito" message="Cita agendada correctamente" duration="2000"
+    (didDismiss)="mostrarExito = false"></ion-toast>
+</ion-content>
