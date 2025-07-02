@@ -58,54 +58,24 @@ export class SocialService {
   }
 
   // Crear nuevo post (ahora acepta imageDataUrl como string)
-  async createPost(content: string, imageDataUrl: string | null): Promise<void> {
+  async createPost(content: string, imageBase64?: string): Promise<void> {
     if (!this.auth.currentUser) return;
 
     const user = this.auth.currentUser;
-    let imageUrl = '';
-
-    // Subir imagen si existe (como string base64)
-    if (imageDataUrl) {
-      try {
-        // Extraer el tipo MIME y los datos base64 del data URL
-        const matches = imageDataUrl.match(/^data:(.+);base64,(.*)$/);
-        if (!matches || matches.length !== 3) {
-          throw new Error('Invalid data URL format');
-        }
-
-        const mimeType = matches[1];
-        const base64Data = matches[2];
-        const fileExtension = mimeType.split('/')[1] || 'jpg';
-        const fileName = `posts/${Date.now()}_${user.uid}.${fileExtension}`;
-
-        // Subir a Firebase Storage
-        const imageRef = ref(this.storage, fileName);
-        await uploadString(imageRef, base64Data, 'base64', {
-          contentType: mimeType
-        });
-        
-        imageUrl = await getDownloadURL(imageRef);
-      } catch (error) {
-        console.error('Error uploading image:', error);
-        throw new Error('Failed to upload image');
-      }
-    }
-
+    
     const postData: Omit<Post, 'id'> = {
       userId: user.uid,
       userEmail: user.email || '',
       userName: user.displayName || user.email?.split('@')[0] || 'Usuario',
-      userAvatar: user.photoURL || '',
       content,
-      imageUrl,
+      imageBase64: imageBase64 ? `data:image/jpeg;base64,${imageBase64}` : undefined,
       timestamp: serverTimestamp(),
       likes: [],
       likesCount: 0,
       commentsCount: 0
     };
 
-    const postsRef = collection(this.firestore, 'posts');
-    await addDoc(postsRef, postData);
+    await addDoc(collection(this.firestore, 'posts'), postData);
   }
 
   // Dar o quitar like (sin cambios)
@@ -188,9 +158,9 @@ export class SocialService {
     if (!post || post.userId !== this.auth.currentUser.uid) return;
 
     // Eliminar imagen de Storage si existe
-    if (post.imageUrl) {
+    if (post.imageBase64) {
       try {
-        const imageRef = ref(this.storage, post.imageUrl);
+        const imageRef = ref(this.storage, post.imageBase64);
         await deleteObject(imageRef);
       } catch (error) {
         console.error('Error deleting image from storage:', error);
