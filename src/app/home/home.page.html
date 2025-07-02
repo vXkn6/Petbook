@@ -22,7 +22,7 @@
       </ion-item>
 
       <!-- Navegación de la app de mascotas -->
-      <ion-item button routerLink="/perfil" routerDirection="forward">
+      <ion-item button routerLink="/profile" routerDirection="forward">
         <ion-icon name="person-outline" slot="start"></ion-icon>
         <ion-label>Perfil</ion-label>
       </ion-item>
@@ -97,7 +97,7 @@
               </ion-button>
             </ion-col>
             <ion-col size="6">
-              <ion-button expand="block" fill="outline" routerLink="/calendar">
+              <ion-button expand="block" fill="outline" routerLink="/citas">
                 <ion-icon name="calendar-outline" slot="start"></ion-icon>
                 Calendario
               </ion-button>
@@ -132,7 +132,7 @@
 
         <!-- Preview de imagen seleccionada -->
         <div *ngIf="selectedImagePreview" class="image-preview">
-          <ion-img [src]="selectedImagePreview" alt="Imagen seleccionada"></ion-img>
+          <ion-img *ngIf="selectedImagePreview" [src]="selectedImagePreview" alt="Preview"></ion-img>
           <ion-button fill="clear" color="danger" (click)="removeSelectedImage()" class="remove-image-btn">
             <ion-icon name="close-outline"></ion-icon>
           </ion-button>
@@ -145,7 +145,7 @@
             Foto
           </ion-button>
 
-          <ion-button (click)="createPost()" [disabled]="isLoading || (!newPostContent.trim() && !selectedImage)"
+          <ion-button (click)="createPost()" [disabled]="isLoading || (!newPostContent.trim() && !selectedImageBase64)"
             color="primary">
             <ion-icon *ngIf="!isLoading" name="send" slot="start"></ion-icon>
             <ion-icon *ngIf="isLoading" name="sync" slot="start" class="spinning"></ion-icon>
@@ -181,8 +181,7 @@
         <!-- Contenido del post -->
         <ion-card-content>
           <p *ngIf="post.content" class="post-content">{{ post.content }}</p>
-          <ion-img *ngIf="post.imageUrl" [src]="post.imageUrl" alt="Imagen del post" class="post-image">
-          </ion-img>
+          <ion-img *ngIf="post.imageBase64" [src]="post.imageBase64" alt="Imagen del post" class="post-image"></ion-img>
         </ion-card-content>
 
         <!-- Acciones del post -->
@@ -190,7 +189,7 @@
           <ion-button fill="clear" (click)="toggleLike(post.id!)" [color]="hasUserLiked(post) ? 'danger' : 'medium'">
             <ion-icon [name]="hasUserLiked(post) ? 'heart' : 'heart-outline'" slot="start">
             </ion-icon>
-            {{ post.likes?.length || 0 }} Me gusta
+            {{ post.likes.length || 0 }} Me gusta
           </ion-button>
 
           <ion-button fill="clear" color="medium" (click)="showComments(post)">

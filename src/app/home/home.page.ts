@@ -18,6 +18,7 @@ import { Post, Comment } from '../models/post.model';
 import { Observable } from 'rxjs';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
+import Compressor from 'compressorjs';
 
 @Component({
   selector: 'app-home',
@@ -35,8 +36,8 @@ export class HomePage {
   // Propiedades de la red social
   posts$: Observable<Post[]>;
   newPostContent = '';
-  selectedImage: string | null = null;
-  selectedImagePreview: string | null = null;
+  selectedImageBase64: string | undefined = undefined;
+  selectedImagePreview: string | undefined = undefined;
 
   isLoading = false;
 
@@ -156,127 +157,114 @@ export class HomePage {
     await actionSheet.present();
   }
 
-  async takePicture(source: CameraSource) {
-    try {
-      const image = await Camera.getPhoto({
-        quality: 90,
-        allowEditing: false,
-        resultType: CameraResultType.DataUrl,
-        source: source
-      });
+async takePicture(source: CameraSource) {
+  try {
+    const image = await Camera.getPhoto({
+      quality: 70,  // ↓ Calidad reducida (70%)
+      allowEditing: false,
+      resultType: CameraResultType.Base64,
+      source: source,
+      width: 800,   // ↓ Ancho máximo
+      height: 800   // ↓ Alto máximo
+    });
 
-      if (image.dataUrl) {
-        this.selectedImagePreview = image.dataUrl;
-        this.selectedImage = image.dataUrl;
-
-        // Guardar localmente (opcional, si quieres persistencia)
-        if (Capacitor.isNativePlatform()) {
-          const fileName = `post_preview_${Date.now()}.jpeg`;
-          const savedFile = await Filesystem.writeFile({
-            path: fileName,
-            data: image.dataUrl,
-            directory: Directory.Data
-          });
-          this.selectedImage = savedFile.uri;
-        }
-      }
-    } catch (error) {
-      console.error('Error al seleccionar imagen:', error);
-      this.showToast('Error al seleccionar imagen', 'danger');
+    if (image.base64String) {
+      const compressedBase64 = await this.compressImage(image.base64String);
+      this.selectedImageBase64 = compressedBase64;
+      this.selectedImagePreview = `data:image/jpeg;base64,${compressedBase64}`;
     }
+  } catch (error) {
+    console.error('Error al tomar foto:', error);
+    this.showToast('Error al capturar imagen', 'danger');
   }
+}
+private async compressImage(base64: string): Promise<string> {
+  // 1. Convertir base64 a Blob
+  const blob = this.base64ToBlob(base64);
+  
+  // 2. Comprimir el Blob
+  const compressedBlob = await new Promise<Blob>((resolve, reject) => {
+    new Compressor(blob, {
+      quality: 0.7,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      success: resolve,
+      error: reject
+    });
+  });
+  
+  // 3. Convertir el Blob comprimido de vuelta a base64
+  return this.blobToBase64(compressedBlob);
+}
+
+private blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      resolve(result.split(',')[1]); // Extrae solo el base64
+    };
+    reader.readAsDataURL(blob);
+  });
+}
+
+private base64ToBlob(base64: string, contentType = 'image/jpeg'): Blob {
+  const byteCharacters = atob(base64);
+  const byteArrays = [];
+  
+  for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+    const slice = byteCharacters.slice(offset, offset + 512);
+    const byteNumbers = new Array(slice.length);
+    
+    for (let i = 0; i < slice.length; i++) {
+      byteNumbers[i] = slice.charCodeAt(i);
+    }
+    
+    const byteArray = new Uint8Array(byteNumbers);
+    byteArrays.push(byteArray);
+  }
+  
+  return new Blob(byteArrays, { type: contentType });
+}
 
   async createPost() {
-    if (!this.newPostContent.trim() && !this.selectedImage) {
+    if (!this.newPostContent.trim() && !this.selectedImageBase64) {
       this.showToast('Escribe algo o selecciona una imagen', 'warning');
       return;
     }
 
-    if (!this.socialService) {
-      this.showToast('Servicio no disponible', 'danger');
-      return;
-    }
-
     this.isLoading = true;
+
     try {
-      // Inicializamos como null en lugar de undefined
-      let imageToUpload: string | null = null;
-
-      if (this.selectedImage) {
-        // Si es una imagen local (capacitor), cargarla como data URL
-        if (!this.selectedImage.startsWith('data:')) {
-          try {
-            const file = await Filesystem.readFile({
-              path: this.selectedImage,
-              directory: Directory.Data
-            });
-            imageToUpload = `data:image/jpeg;base64,${file.data}`;
-          } catch (error) {
-            console.error('Error reading local image:', error);
-            imageToUpload = null;
-          }
-        } else {
-          // Si ya es un data URL
-          imageToUpload = this.selectedImage;
-        }
-      }
-
       await this.socialService.createPost(
         this.newPostContent,
-        imageToUpload // Ahora es string | null, que coincide con lo que espera el servicio
+        this.selectedImageBase64
       );
 
-      this.newPostContent = '';
-      this.selectedImage = null;
-      this.selectedImagePreview = null;
-      this.showToast('¡Publicación creada exitosamente!', 'success');
+      this.resetPostForm();
+      this.showToast('¡Publicación creada!', 'success');
     } catch (error) {
-      console.error('Error al crear post:', error);
-      this.showToast('Error al crear la publicación', 'danger');
+      console.error('Error:', error);
+      this.showToast('Error al crear publicación', 'danger');
+    } finally {
+      this.isLoading = false;
     }
-    this.isLoading = false;
   }
 
-  private async loadLocalImageForPost(post: Post): Promise<string> {
-    if (!post.imageUrl) return '';
-
-    // Si ya tenemos la ruta local
-    if (this.localImagePaths[post.id!]) {
-      return this.localImagePaths[post.id!];
-    }
-
-    // Si es una URL web normal
-    if (post.imageUrl.startsWith('http')) {
-      return post.imageUrl;
-    }
-
-    // Si es una imagen local (capacitor)
-    if (Capacitor.isNativePlatform()) {
-      try {
-        const file = await Filesystem.readFile({
-          path: post.imageUrl,
-          directory: Directory.Data
-        });
-        const dataUrl = `data:image/jpeg;base64,${file.data}`;
-        this.localImagePaths[post.id!] = dataUrl;
-        return dataUrl;
-      } catch (error) {
-        console.error('Error loading local image:', error);
-        return '';
-      }
-    }
-
-    return post.imageUrl;
+  private resetPostForm() {
+    this.newPostContent = '';
+    this.selectedImageBase64 = undefined;
+    this.selectedImagePreview = undefined;
   }
-  async getPostImage(post: Post): Promise<string> {
-    if (!post.imageUrl) return '';
-    return this.loadLocalImageForPost(post);
+
+  getPostImage(post: Post): string | null | undefined {
+    return post.imageBase64;
   }
+
   removeSelectedImage() {
-    this.selectedImage = null;
-    this.selectedImagePreview = null;
+    this.selectedImageBase64 = undefined; // En lugar de null
+    this.selectedImagePreview = undefined;
   }
-
   async toggleLike(postId: string) {
     if (!this.socialService) return;
 
@@ -468,4 +456,3 @@ export class HomePage {
     return this.userName || this.userEmail?.split('@')[0] || 'Usuario';
   }
 }
-
