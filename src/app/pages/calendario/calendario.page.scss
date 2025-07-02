@@ -1,0 +1,144 @@
+.recordatorios-container {
+  padding: 0 16px 80px 16px; // Espacio para el FAB
+}
+
+.empty-state {
+  margin: 20px 0;
+  
+  ion-card-content {
+    padding: 40px 20px;
+    
+    ion-icon {
+      margin-bottom: 16px;
+    }
+    
+    h3 {
+      color: var(--ion-color-medium);
+      margin: 16px 0 8px 0;
+    }
+    
+    p {
+      color: var(--ion-color-medium);
+      margin: 0;
+      font-size: 14px;
+    }
+  }
+}
+
+.recordatorio-card {
+  margin: 16px 0;
+  border-left: 4px solid var(--ion-color-primary);
+  
+  .recordatorio-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    
+    .tiempo-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      
+      ion-icon {
+        font-size: 18px;
+      }
+      
+      .hora {
+        font-weight: 600;
+        font-size: 16px;
+        color: var(--ion-color-primary);
+      }
+    }
+    
+    .acciones {
+      display: flex;
+      gap: 4px;
+    }
+  }
+  
+  .descripcion {
+    margin: 12px 0;
+    line-height: 1.5;
+    color: var(--ion-color-dark);
+  }
+  
+  .recordatorio-info {
+    margin-top: 12px;
+    
+    ion-chip {
+      font-size: 12px;
+      height: 28px;
+      
+      ion-icon {
+        font-size: 14px;
+      }
+    }
+  }
+}
+
+// Estilos para el datetime
+ion-datetime {
+  --background: var(--ion-color-light);
+  --background-rgb: var(--ion-color-light-rgb);
+}
+
+// Estilos para el FAB
+ion-fab-button {
+  --background: var(--ion-color-primary);
+  --color: white;
+  --box-shadow: 0 4px 16px rgba(var(--ion-color-primary-rgb), 0.3);
+}
+
+// Estilos responsivos
+@media (max-width: 768px) {
+  .recordatorio-card {
+    margin: 12px 0;
+    
+    .recordatorio-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+      
+      @media (min-width: 480px) {
+        flex-direction: row;
+        align-items: center;
+      }
+    }
+  }
+}
+
+// Animaciones
+.recordatorio-card {
+  transition: transform 0.2s ease-in-out;
+  
+  &:hover {
+    transform: translateY(-2px);
+  }
+}
+
+ion-fab-button {
+  transition: transform 0.2s ease-in-out;
+  
+  &:hover {
+    transform: scale(1.05);
+  }
+}
+
+// Estados de los botones
+ion-button {
+  &[color="danger"] {
+    --color: var(--ion-color-danger);
+    
+    &:hover {
+      --background: rgba(var(--ion-color-danger-rgb), 0.1);
+    }
+  }
+  
+  &[color="medium"] {
+    --color: var(--ion-color-medium);
+    
+    &:hover {
+      --background: rgba(var(--ion-color-medium-rgb), 0.1);
+    }
+  }
+}

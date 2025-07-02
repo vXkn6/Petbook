@@ -1,0 +1,82 @@
+<ion-header [translucent]="true">
+  <ion-toolbar color="dark">
+    <ion-title>
+      <ion-icon name="chatbubbles-outline" style="margin-right: 8px;"></ion-icon>
+      Asistente Virtual
+    </ion-title>
+    <ion-buttons slot="end">
+      <ion-button fill="clear" (click)="clearChat()">
+        <ion-icon name="refresh-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true" class="chat-content">
+  
+  <!-- Área de mensajes -->
+  <div #chatContainer class="chat-container">
+    <div *ngFor="let message of messages" 
+         class="message-wrapper"
+         [ngClass]="{'user-message': message.isUser, 'bot-message': !message.isUser}">
+      
+      <div class="message-bubble" 
+           [ngClass]="{'user-bubble': message.isUser, 'bot-bubble': !message.isUser}">
+        <p>{{ message.text }}</p>
+        <span class="message-time">
+          {{ message.timestamp | date:'HH:mm' }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Indicador de escritura -->
+    <div *ngIf="isTyping" class="message-wrapper bot-message">
+      <div class="message-bubble bot-bubble typing-indicator">
+        <div class="typing-dots">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</ion-content>
+
+<!-- Respuestas rápidas - Siempre visibles -->
+<div class="quick-replies">
+  <h3>💬 Preguntas frecuentes:</h3>
+  <div class="quick-replies-container">
+    <ion-chip 
+      *ngFor="let reply of quickReplies" 
+      (click)="sendQuickReply(reply)"
+      color="primary"
+      outline="true">
+      <ion-label>{{ reply.text }}</ion-label>
+    </ion-chip>
+  </div>
+</div>
+
+<!-- Área de entrada de mensaje -->
+<ion-footer class="message-input-footer">
+  <ion-toolbar color="dark">
+    <div class="input-container">
+      <ion-item lines="none" class="message-input-item">
+        <ion-input 
+          #messageInput
+          [(ngModel)]="currentMessage" 
+          placeholder="Escribe tu mensaje..."
+          (keypress)="onKeyPress($event)"
+          class="message-input">
+        </ion-input>
+        <ion-button 
+          fill="clear" 
+          slot="end" 
+          (click)="sendMessage()"
+          [disabled]="currentMessage.trim() === ''">
+          <ion-icon name="send" color="primary"></ion-icon>
+        </ion-button>
+      </ion-item>
+    </div>
+  </ion-toolbar>
+</ion-footer>

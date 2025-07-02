@@ -12,7 +12,7 @@
 
   <!-- Segmento para días de la semana -->
 
-  <ion-segment [(ngModel)]="diaSeleccionado" (ionChange)="filtrarVeterinarios()">
+  <ion-segment [(ngModel)]="diaSeleccionado" [scrollable]="true" (ionChange)="filtrarVeterinarios()">
     <ion-segment-button *ngFor="let dia of diasSemana" [value]="dia">
       <ion-label>{{ obtenerAbreviaturaDia(dia) }}</ion-label>
     </ion-segment-button>

@@ -30,10 +30,23 @@ const routes: Routes = [
     loadChildren: () => import('./pages/petfile/petfile.module').then( m => m.PetfilePageModule)
   },
   {
+    path: 'calendario',
+    loadChildren: () => import('./pages/calendario/calendario.module').then( m => m.CalendarioPageModule)
+  },
+  {
+    path: 'chatbot',
+    loadChildren: () => import('./pages/chatbot/chatbot.module').then( m => m.ChatbotPageModule)
+  },
+  {
+    path: 'citas',
+    loadChildren: () => import('./pages/citas/citas.module').then( m => m.CitasPageModule)
+  },
+  {
     path: '**',
     redirectTo: 'login'
   },
-
+  
+  
 
 
 ];

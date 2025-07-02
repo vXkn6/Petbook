@@ -5,7 +5,7 @@ export interface Post {
   userName: string;
   userAvatar?: string;
   content: string;
-  imageUrl?: string;
+  imageBase64?: string | null;
   timestamp: any; 
   likes: string[]; 
   likesCount: number;

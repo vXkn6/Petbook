@@ -9,7 +9,6 @@
 
 <ion-content class="ion-padding">
   <form (ngSubmit)="crearCita()">
-    <!-- Selección de Veterinario -->
     <ion-item>
       <ion-select aria-label="Veterinario" interface="action-sheet" placeholder="Seleccionar veterinario"
         [(ngModel)]="nuevaCita.veterinarioId" name="veterinario" required (ionChange)="cargarHorariosDisponibles()">
@@ -19,7 +18,6 @@
       </ion-select>
     </ion-item>
 
-    <!-- Fecha de la cita -->
     <ion-item>
       <ion-label position="stacked">Fecha</ion-label>
       <ion-datetime presentation="date" [(ngModel)]="fechaSeleccionada" name="fecha" required [min]="fechaMinima"
@@ -27,34 +25,33 @@
       </ion-datetime>
     </ion-item>
 
-    <!-- Hora de la cita -->
     <ion-item>
+      <ion-label>Hora</ion-label>
       <ion-select aria-label="Hora" interface="action-sheet" placeholder="Seleccionar hora" [(ngModel)]="nuevaCita.hora"
-        name="hora" required [disabled]="!horariosDisponibles.length">
+        name="hora" required [disabled]="!horariosDisponibles.length || !nuevaCita.veterinarioId">
         <ion-select-option *ngFor="let hora of horariosDisponibles" [value]="hora">
           {{ hora }}
         </ion-select-option>
       </ion-select>
     </ion-item>
 
-    <!-- Motivo de la cita -->
     <ion-item>
       <ion-textarea label="Motivo de la cita" labelPlacement="stacked" placeholder="Describa el motivo de la cita"
         [(ngModel)]="nuevaCita.motivo" name="motivo" required rows="4">
       </ion-textarea>
     </ion-item>
 
-    <!-- Mascota -->
     <ion-item *ngIf="mascotas && mascotas.length > 0">
-      <ion-select aria-label="Mascota" interface="action-sheet" placeholder="Seleccionar mascota"
-        [(ngModel)]="nuevaCita.petId" name="mascota">
+      <ion-label>Mascota *</ion-label> <ion-select aria-label="Mascota" interface="action-sheet" placeholder="Seleccionar mascota"
+        [(ngModel)]="nuevaCita.petId" name="mascota" required>
         <ion-select-option *ngFor="let mascota of mascotas" [value]="mascota.id">
-          {{ mascota.nombre }} ({{ mascota.tipo }})
-        </ion-select-option>
+          {{ mascota.name }} ({{ mascota.speciesName }}) </ion-select-option>
       </ion-select>
     </ion-item>
+    <ion-item *ngIf="!mascotas || mascotas.length === 0">
+        <ion-text color="medium">No tienes mascotas registradas. Por favor, agrega una en "Mis Mascotas".</ion-text>
+    </ion-item>
 
-    <!-- Botón de guardar -->
     <ion-button expand="block" type="submit" [disabled]="!formularioValido()" class="ion-margin-top">
       <ion-icon slot="start" name="calendar"></ion-icon>
       Agendar Cita
