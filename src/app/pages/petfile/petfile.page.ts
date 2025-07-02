@@ -7,13 +7,13 @@ import { Auth } from '@angular/fire/auth';
 import { authState } from 'rxfire/auth';
 import { Storage, ref, deleteObject, StorageModule, } from '@angular/fire/storage';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
-import { AngularFireStorageModule } from '@angular/fire/compat/storage';
 import { Subscription } from 'rxjs';
 import { Filesystem, Directory, } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
 import { addIcons } from 'ionicons';
 import { add, camera, close, create, paw, trash, } from 'ionicons/icons';
 import { Pet, Species, Breed } from '../../models/pet.model';
+import Compressor from 'compressorjs';
 
 
 @Component({
@@ -248,11 +248,24 @@ export class PetfilePage implements OnInit, OnDestroy {
 
   async submitForm() {
     if (!this.userUid || this.petForm.invalid) return;
+
+    const loading = await this.loadingCtrl.create({
+      message: 'Guardando mascota...'
+    });
+    await loading.present();
+
     try {
+      // Verificar si la imagen es demasiado grande (Firestore limita a 1MB)
+      let photoUrl = this.selectedPhoto || '';
+      if (photoUrl && photoUrl.length > 900 * 1024) {
+        // Comprimir más si es necesario
+        photoUrl = await this.compressImage(photoUrl);
+      }
+
       const petData: Record<string, any> = {
         ...this.petForm.value,
         userId: this.userUid,
-        photoUrl: this.selectedPhoto || '',
+        photoUrl, // Usamos la URL comprimida
         speciesName: this.species.find(s => s.id === this.petForm.value.species)?.name || '',
         breedName: this.breeds.find(b => b.id === this.petForm.value.breed)?.name || ''
       };
@@ -263,16 +276,29 @@ export class PetfilePage implements OnInit, OnDestroy {
         await addDoc(collection(this.firestore, 'pets'), petData);
       }
 
+      const toast = await this.toastCtrl.create({
+        message: 'Mascota guardada correctamente',
+        duration: 2000,
+        color: 'success'
+      });
+      await toast.present();
+
       this.petForm.reset();
       this.selectedPhoto = null;
       this.isEditing = false;
       this.currentPetId = null;
       await this.loadPets();
-
     } catch (error) {
       console.error('Error saving pet:', error);
+      const toast = await this.toastCtrl.create({
+        message: 'Error al guardar la mascota',
+        duration: 2000,
+        color: 'danger'
+      });
+      await toast.present();
+    } finally {
+      await loading.dismiss();
     }
-
   }
 
   async deletePet(pet: Pet) {
@@ -377,7 +403,6 @@ export class PetfilePage implements OnInit, OnDestroy {
   }
 
   async getPicture(source: CameraSource) {
-
     try {
       const image = await Camera.getPhoto({
         quality: 90,
@@ -387,12 +412,54 @@ export class PetfilePage implements OnInit, OnDestroy {
       });
 
       if (image.dataUrl) {
-        this.selectedPhoto = image.dataUrl;
+        // Comprimir la imagen antes de asignarla
+        const compressedDataUrl = await this.compressImage(image.dataUrl);
+        this.selectedPhoto = compressedDataUrl;
       }
     } catch (error) {
       console.error('Error taking picture:', error);
+      const toast = await this.toastCtrl.create({
+        message: 'Error al procesar la imagen',
+        duration: 2000,
+        color: 'danger'
+      });
+      await toast.present();
+    }
+  }
+
+  private async compressImage(dataUrl: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      // Convertir Data URL a Blob
+      const blob = this.dataUrlToBlob(dataUrl);
+
+      new Compressor(blob, {
+        quality: 0.7,
+        maxWidth: 800,
+        maxHeight: 800,
+        success(result) {
+          // Convertir el Blob comprimido de vuelta a Data URL
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(result);
+        },
+        error: reject
+      });
+    });
+  }
+
+  private dataUrlToBlob(dataUrl: string): Blob {
+    const arr = dataUrl.split(',');
+    const mime = arr[0].match(/:(.*?);/)![1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
     }
 
+    return new Blob([u8arr], { type: mime });
   }
 
   private async loadLocalImage(path: string): Promise<string> {
@@ -419,6 +486,7 @@ export class PetfilePage implements OnInit, OnDestroy {
     }
 
   }
+
   async openSpeciesBreedModal(isSpecies: boolean) {
     this.isAddingSpecies = isSpecies;
     this.speciesBreedForm.reset();
