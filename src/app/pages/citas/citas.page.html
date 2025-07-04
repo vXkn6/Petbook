@@ -3,61 +3,134 @@
     <ion-buttons slot="start">
       <ion-back-button defaultHref="/home"></ion-back-button>
     </ion-buttons>
-    <ion-title>Nueva Cita Médica</ion-title>
+    <ion-title>Citas Médicas</ion-title>
   </ion-toolbar>
 </ion-header>
 
 <ion-content class="ion-padding">
-  <form (ngSubmit)="crearCita()">
-    <ion-item>
-      <ion-select aria-label="Veterinario" interface="action-sheet" placeholder="Seleccionar veterinario"
-        [(ngModel)]="nuevaCita.veterinarioId" name="veterinario" required (ionChange)="cargarHorariosDisponibles()">
-        <ion-select-option *ngFor="let vet of veterinariosDisponibles" [value]="vet.id">
-          {{ vet.nombre }} ({{ vet.especialidad }})
-        </ion-select-option>
-      </ion-select>
-    </ion-item>
+  <ion-segment [(ngModel)]="viewMode" value="nueva">
+    <ion-segment-button value="nueva">
+      <ion-label>Nueva Cita</ion-label>
+    </ion-segment-button>
+    <ion-segment-button value="agendadas">
+      <ion-label>Citas Agendadas</ion-label>
+    </ion-segment-button>
+  </ion-segment>
 
-    <ion-item>
-      <ion-label position="stacked">Fecha</ion-label>
-      <ion-datetime presentation="date" [(ngModel)]="fechaSeleccionada" name="fecha" required [min]="fechaMinima"
-        [max]="fechaMaxima" (ionChange)="actualizarFechaCita($event)">
-      </ion-datetime>
-    </ion-item>
+  <div *ngIf="viewMode === 'nueva'">
+    <form (ngSubmit)="crearCita()">
+      <ion-item>
+        <ion-select aria-label="Veterinario" interface="action-sheet" placeholder="Seleccionar veterinario"
+          [(ngModel)]="nuevaCita.veterinarioId" name="veterinario" required (ionChange)="cargarHorariosDisponibles()">
+          <ion-select-option *ngFor="let vet of veterinariosDisponibles" [value]="vet.id">
+            {{ vet.nombre }} ({{ vet.especialidad }})
+          </ion-select-option>
+        </ion-select>
+      </ion-item>
 
-    <ion-item>
-      <ion-label>Hora</ion-label>
-      <ion-select aria-label="Hora" interface="action-sheet" placeholder="Seleccionar hora" [(ngModel)]="nuevaCita.hora"
-        name="hora" required [disabled]="!horariosDisponibles.length || !nuevaCita.veterinarioId">
-        <ion-select-option *ngFor="let hora of horariosDisponibles" [value]="hora">
-          {{ hora }}
-        </ion-select-option>
-      </ion-select>
-    </ion-item>
+      <ion-item>
+        <ion-label position="stacked">Fecha</ion-label>
+        <ion-datetime presentation="date" [(ngModel)]="fechaSeleccionada" name="fecha" required [min]="fechaMinima"
+          [max]="fechaMaxima" (ionChange)="actualizarFechaCita($event)">
+        </ion-datetime>
+      </ion-item>
 
-    <ion-item>
-      <ion-textarea label="Motivo de la cita" labelPlacement="stacked" placeholder="Describa el motivo de la cita"
-        [(ngModel)]="nuevaCita.motivo" name="motivo" required rows="4">
-      </ion-textarea>
-    </ion-item>
+      <ion-item>
+        <ion-label>Hora</ion-label>
+        <ion-select aria-label="Hora" interface="action-sheet" placeholder="Seleccionar hora"
+          [(ngModel)]="nuevaCita.hora" name="hora" required
+          [disabled]="!horariosDisponibles.length || !nuevaCita.veterinarioId">
+          <ion-select-option *ngFor="let hora of horariosDisponibles" [value]="hora">
+            {{ hora }}
+          </ion-select-option>
+        </ion-select>
+      </ion-item>
 
-    <ion-item *ngIf="mascotas && mascotas.length > 0">
-      <ion-label>Mascota *</ion-label> <ion-select aria-label="Mascota" interface="action-sheet" placeholder="Seleccionar mascota"
-        [(ngModel)]="nuevaCita.petId" name="mascota" required>
-        <ion-select-option *ngFor="let mascota of mascotas" [value]="mascota.id">
-          {{ mascota.name }} ({{ mascota.speciesName }}) </ion-select-option>
-      </ion-select>
-    </ion-item>
-    <ion-item *ngIf="!mascotas || mascotas.length === 0">
+      <ion-item>
+        <ion-textarea label="Motivo de la cita" labelPlacement="stacked" placeholder="Describa el motivo de la cita"
+          [(ngModel)]="nuevaCita.motivo" name="motivo" required rows="4">
+        </ion-textarea>
+      </ion-item>
+
+      <ion-item *ngIf="mascotas && mascotas.length > 0">
+        <ion-label>Mascota *</ion-label>
+        <ion-select aria-label="Mascota" interface="action-sheet" placeholder="Seleccionar mascota"
+          [(ngModel)]="nuevaCita.petId" name="mascota" required>
+          <ion-select-option *ngFor="let mascota of mascotas" [value]="mascota.id">
+            {{ mascota.name }} ({{ mascota.speciesName }})
+          </ion-select-option>
+        </ion-select>
+      </ion-item>
+      <ion-item *ngIf="!mascotas || mascotas.length === 0">
         <ion-text color="medium">No tienes mascotas registradas. Por favor, agrega una en "Mis Mascotas".</ion-text>
-    </ion-item>
+      </ion-item>
 
-    <ion-button expand="block" type="submit" [disabled]="!formularioValido()" class="ion-margin-top">
-      <ion-icon slot="start" name="calendar"></ion-icon>
-      Agendar Cita
-    </ion-button>
-  </form>
+      <ion-button expand="block" type="submit" [disabled]="!formularioValido()" class="ion-margin-top">
+        <ion-icon slot="start" name="calendar"></ion-icon>
+        Agendar Cita
+      </ion-button>
+    </form>
+  </div>
+
+  <div *ngIf="viewMode === 'agendadas'">
+    <ion-list>
+      <ion-item *ngFor="let cita of citasAgendadas" (click)="citaSeleccionada = cita; modalDetalleVisible = true">
+        <ion-label>
+          <h2>{{ cita.vetName || 'Veterinario' }}</h2>
+          <p>{{ cita.fecha | date }} - {{ cita.hora }}</p>
+          <p>{{ cita.petName || 'Mascota' }}</p>
+        </ion-label>
+      </ion-item>
+    </ion-list>
+
+    <ion-alert *ngIf="citasAgendadas.length === 0" [isOpen]="true" header="No hay citas agendadas"
+      message="No tienes citas programadas actualmente." [buttons]="alertButtons">
+    </ion-alert>
+  </div>
+
+  <ion-modal [isOpen]="modalDetalleVisible" (didDismiss)="modalDetalleVisible = false">
+    <ng-template>
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>Detalle Cita</ion-title>
+          <ion-buttons slot="end">
+            <ion-button (click)="modalDetalleVisible = false">Cerrar</ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content *ngIf="citaSeleccionada">
+        <ion-card>
+          <ion-card-header>
+            <ion-card-title>{{ citaSeleccionada.petName }}</ion-card-title>
+            <ion-card-subtitle>{{ citaSeleccionada.vetName }}</ion-card-subtitle>
+          </ion-card-header>
+          
+          <ion-card-content>
+            <p><strong>Fecha:</strong> {{ citaSeleccionada.fecha | date }}</p>
+            <p><strong>Hora:</strong> {{ citaSeleccionada.hora }}</p>
+            <p><strong>Motivo:</strong> {{ citaSeleccionada.motivo }}</p>
+
+            <!-- Sección de receta -->
+            <div *ngIf="puedeVerReceta(citaSeleccionada)">
+              <h3>Receta Médica</h3>
+              <ion-img *ngIf="citaSeleccionada.recetaBase64" 
+                      [src]="'data:image/jpeg;base64,' + citaSeleccionada.recetaBase64"
+                      style="max-height: 300px;"></ion-img>
+              <p *ngIf="!citaSeleccionada.recetaBase64">No hay receta disponible</p>
+            </div>
+
+            <!-- Botón para subir receta (solo admin) -->
+            <ion-button *ngIf="esAdmin" expand="block" (click)="fileInput.click()">
+              Subir Receta
+            </ion-button>
+            <input type="file" #fileInput hidden accept="image/*" (change)="subirReceta($event)">
+          </ion-card-content>
+        </ion-card>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
 
   <ion-toast [isOpen]="mostrarExito" message="Cita agendada correctamente" duration="2000"
-    (didDismiss)="mostrarExito = false"></ion-toast>
+    (didDismiss)="mostrarExito = false">
+  </ion-toast>
 </ion-content>
