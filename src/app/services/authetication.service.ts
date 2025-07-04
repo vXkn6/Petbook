@@ -5,8 +5,10 @@ import {
   signInWithEmailAndPassword, 
   signOut, 
   authState,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  UserCredential
 } from '@angular/fire/auth';
+import { Firestore, collection, doc, setDoc } from '@angular/fire/firestore';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { Router } from '@angular/router';
@@ -16,6 +18,7 @@ import { Router } from '@angular/router';
 })
 export class AutheticationService {
  private auth: Auth = inject(Auth);
+   private firestore: Firestore = inject(Firestore);
   private router: Router = inject(Router);
   
   private authState = new BehaviorSubject<boolean>(false);
@@ -38,6 +41,25 @@ export class AutheticationService {
       const userCredential = await createUserWithEmailAndPassword(this.auth, email, password);
       return userCredential;
     } catch (error) {
+      throw error;
+    }
+  }
+  
+  async saveUserData(uid: string, email: string, displayName?: string): Promise<void> {
+    try {
+      const usersCollectionRef = collection(this.firestore, 'users'); // Referencia a la colección 'users'
+      const userDocRef = doc(usersCollectionRef, uid); // Referencia al documento específico con el UID como ID
+
+      await setDoc(userDocRef, {
+        email: email,
+        displayName: displayName || 'Usuario Nuevo', // Puedes pasar un nombre o usar uno por defecto
+        role: 'user', // Rol por defecto al registrar
+        creationTime: new Date(), // Fecha de creación del usuario
+        isActive: true // Estado por defecto
+      });
+      console.log('Datos de usuario guardados en Firestore:', uid);
+    } catch (error) {
+      console.error('Error al guardar datos del usuario en Firestore:', error);
       throw error;
     }
   }

@@ -7,6 +7,7 @@ import { IonicModule, IonicRouteStrategy } from '@ionic/angular';
 import { AppComponent } from './app.component';
 import { AppRoutingModule } from './app-routing.module';
 
+import { CommonModule } from '@angular/common';
 
 import { provideFirebaseApp, initializeApp } from '@angular/fire/app';
 import { provideAuth, getAuth } from '@angular/fire/auth';
@@ -18,7 +19,7 @@ import { getStorage } from 'firebase/storage';
 
 @NgModule({
   declarations: [AppComponent],
-  imports: [BrowserModule, IonicModule.forRoot({mode: 'ios'}), AppRoutingModule, ],
+  imports: [BrowserModule, IonicModule.forRoot({mode:'ios'}), AppRoutingModule,],
   providers: [{ provide: RouteReuseStrategy, useClass: IonicRouteStrategy, },
     provideFirebaseApp(() => initializeApp(environment.firebaseConfig)),
     provideAuth(() => getAuth()),

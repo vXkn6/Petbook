@@ -1,0 +1,50 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-title>Mi Perfil</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <form [formGroup]="profileForm" (ngSubmit)="updateProfile()">
+    <ion-grid>
+      <ion-row class="ion-justify-content-center">
+        <ion-col size="12" class="ion-text-center">
+          <div class="avatar-container" (click)="changeProfilePicture()">
+            <ion-avatar>
+              <img [src]="selectedPhoto || 'https://ionicframework.com/docs/img/demos/avatar.svg'" alt="Foto de perfil">
+            </ion-avatar>
+            <ion-button fill="clear" class="edit-icon">
+              <ion-icon slot="icon-only" name="camera"></ion-icon>
+            </ion-button>
+          </div>
+        </ion-col>
+      </ion-row>
+
+      <ion-row>
+        <ion-col size="12">
+          <ion-item>
+            <ion-label position="floating">Nombre</ion-label>
+            <ion-input formControlName="displayName" type="text"></ion-input>
+          </ion-item>
+        </ion-col>
+      </ion-row>
+
+      <ion-row>
+        <ion-col size="12">
+          <ion-item>
+            <ion-label position="floating">Email</ion-label>
+<ion-input formControlName="email" type="email" [disabled]="true"></ion-input>
+          </ion-item>
+        </ion-col>
+      </ion-row>
+
+      <ion-row>
+        <ion-col size="12">
+          <ion-button type="submit" expand="block" [disabled]="!profileForm.valid || !profileForm.dirty">
+            Guardar Cambios
+          </ion-button>
+        </ion-col>
+      </ion-row>
+    </ion-grid>
+  </form>
+</ion-content>

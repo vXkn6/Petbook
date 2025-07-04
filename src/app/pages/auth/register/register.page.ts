@@ -54,9 +54,17 @@ registerForm: FormGroup;
 
       try {
         const { email, password } = this.registerForm.value;
-        await this.authService.register(email, password);
+        // La llamada a register ahora devuelve el UserCredential
+        const userCredential = await this.authService.register(email, password);
+
+        // --- Guardar datos adicionales en Firestore ---
+        if (userCredential.user) {
+          await this.authService.saveUserData(userCredential.user.uid, userCredential.user.email || email);
+        }
+        // ----------------------------------------------
+
         loading.dismiss();
-        
+
         const alert = await this.alertController.create({
           header: 'Registro exitoso',
           message: 'Tu cuenta ha sido creada con éxito. Ya puedes iniciar sesión.',

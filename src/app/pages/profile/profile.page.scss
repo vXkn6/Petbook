@@ -1,0 +1,29 @@
+.avatar-container {
+  position: relative;
+  display: inline-block;
+  margin-bottom: 20px;
+
+  ion-avatar {
+    width: 100px;
+    height: 100px;
+  }
+
+  .edit-icon {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    --padding-start: 0;
+    --padding-end: 0;
+    --padding-top: 0;
+    --padding-bottom: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--ion-color-primary);
+    color: white;
+
+    ion-icon {
+      font-size: 16px;
+    }
+  }
+}

@@ -3,7 +3,7 @@
     <ion-buttons slot="start">
       <ion-back-button defaultHref="/home"></ion-back-button>
     </ion-buttons>
-    <ion-title *ngIf="userRole === 'owner'">Veterinarios</ion-title>
+    <ion-title *ngIf="userRole === 'user'">Veterinarios</ion-title>
     <ion-title *ngIf="userRole === 'admin'">Gestion de Veterinarios</ion-title>
   </ion-toolbar>
 </ion-header>
@@ -31,8 +31,8 @@
     </div>
 
     <div *ngIf="veterinariosFiltrados.length === 0" class="empty-state ion-text-center ion-padding">
-      <ion-icon name="paw" color="medium" size="large" *ngIf="userRole === 'owner'"></ion-icon>
-      <ion-text color="medium" *ngIf="userRole === 'owner'">
+      <ion-icon name="paw" color="medium" size="large" *ngIf="userRole === 'user'"></ion-icon>
+      <ion-text color="medium" *ngIf="userRole === 'user'">
         <h3>No hay veterinarios trabajando el {{ diaSeleccionado }}</h3>
         <p>Selecciona otro día</p>
       </ion-text>
@@ -59,7 +59,7 @@
             (ionChange)="actualizarDisponibilidad(vet.id, $event.detail.checked)"
             *ngIf="userRole === 'admin'"></ion-toggle>
         </ion-item>
-        <ion-item-options side="end">
+        <ion-item-options side="end" *ngIf="userRole === 'admin'">
           <ion-item-option color="warning" (click)="abrirModalEdicion(vet)">
             <ion-icon name="pencil" slot="icon-only"></ion-icon>
           </ion-item-option>
@@ -85,7 +85,7 @@
 
   <!-- Botón flotante para agregar nuevo -->
 
-  <ion-fab vertical="bottom" horizontal="end" slot="fixed">
+  <ion-fab vertical="bottom" horizontal="end" slot="fixed" *ngIf="userRole === 'admin'">
     <ion-fab-button (click)="abrirModalCreacion()">
       <ion-icon name="add"></ion-icon>
     </ion-fab-button>

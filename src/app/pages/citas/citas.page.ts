@@ -6,15 +6,11 @@ import { CommonModule } from '@angular/common';
 import { AutheticationService } from 'src/app/services/authetication.service';
 import { Cita } from 'src/app/models/cita.model';
 
-// Asegúrate de que esta interfaz coincida con la estructura de tus documentos 'pets' en Firebase
-// No es necesario que 'id' sea opcional aquí si siempre lo obtendremos de doc.id
+
 interface Pet {
-  id: string; // Este 'id' será el doc.id de Firestore
+  id: string;
   name: string;
-  speciesName: string; // Para mostrar en el select
-  // Otros campos relevantes de la mascota que quieras tener disponibles, si aplica
-  // Por ejemplo, si guardas 'breedName', podrías añadirlo aquí:
-  // breedName?: string; 
+  speciesName: string; 
 }
 
 @Component({
@@ -53,7 +49,7 @@ export class CitasPage implements OnInit {
     fecha: '',
     hora: '',
     motivo: '',
-    petId: '', // Aquí guardaremos el ID de la mascota seleccionada
+    petId: '', 
     userId: ''
   };
 
@@ -164,6 +160,7 @@ export class CitasPage implements OnInit {
     const toast = await this.toastController.create({ message, duration: 2000, color });
     await toast.present();
   }
+  
   async cargarVeterinariosDisponibles(fecha: string) {
     const fechaObj = new Date(fecha);
     const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
