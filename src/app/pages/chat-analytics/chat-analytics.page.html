@@ -1,0 +1,150 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-title>Análisis de Chatbot</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="refreshData()">
+        <ion-icon slot="icon-only" name="refresh"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <!-- Filtros -->
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Filtros</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <ion-item>
+        <ion-label>Rango de fechas</ion-label>
+        <ion-select [(ngModel)]="dateRange" (ionChange)="loadData()">
+          <ion-select-option value="7">Últimos 7 días</ion-select-option>
+          <ion-select-option value="30">Últimos 30 días</ion-select-option>
+          <ion-select-option value="90">Últimos 3 meses</ion-select-option>
+          <ion-select-option value="180">Últimos 6 meses</ion-select-option>
+          <ion-select-option value="custom">Personalizado</ion-select-option>
+        </ion-select>
+      </ion-item>
+
+      <div *ngIf="dateRange === 'custom'" class="custom-dates">
+        <ion-item>
+          <ion-label>Desde</ion-label>
+          <ion-datetime displayFormat="DD/MM/YYYY" [(ngModel)]="startDate" (ionChange)="loadData()"></ion-datetime>
+        </ion-item>
+        <ion-item>
+          <ion-label>Hasta</ion-label>
+          <ion-datetime displayFormat="DD/MM/YYYY" [(ngModel)]="endDate" (ionChange)="loadData()"></ion-datetime>
+        </ion-item>
+      </div>
+    </ion-card-content>
+  </ion-card>
+
+  <!-- Resumen general -->
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Resumen General</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <div class="stats-grid">
+        <div class="stat-item">
+          <h3>Total preguntas</h3>
+          <p class="stat-value">{{totalQuestions | number}}</p>
+        </div>
+        <div class="stat-item">
+          <h3>Preguntas únicas</h3>
+          <p class="stat-value">{{uniqueQuestions | number}}</p>
+        </div>
+        <div class="stat-item">
+          <h3>Respuestas automáticas</h3>
+          <p class="stat-value">{{autoResponses | number}} ({{autoResponsePercentage | percent}})</p>
+        </div>
+        <div class="stat-item">
+          <h3>Preguntas sin respuesta</h3>
+          <p class="stat-value">{{unansweredQuestions | number}} ({{unansweredPercentage | percent}})</p>
+        </div>
+      </div>
+    </ion-card-content>
+  </ion-card>
+
+  <!-- Preguntas más frecuentes -->
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Preguntas Más Frecuentes</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <div class="chart-container">
+        <canvas #topQuestionsChart></canvas>
+      </div>
+      <ion-list>
+        <ion-item *ngFor="let question of topQuestions">
+          <ion-label class="question-text">{{question.text}}</ion-label>
+          <ion-badge slot="end" color="primary">{{question.count}}</ion-badge>
+        </ion-item>
+      </ion-list>
+    </ion-card-content>
+  </ion-card>
+
+  <!-- Tendencias mensuales -->
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Tendencias Mensuales</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <div class="chart-container">
+        <canvas #monthlyTrendsChart></canvas>
+      </div>
+    </ion-card-content>
+  </ion-card>
+
+  <!-- Categorías de preguntas -->
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Categorías de Preguntas</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <!-- Mostrar gráfico solo si hay datos -->
+      <div *ngIf="categories.length > 0" class="chart-container"
+        style="position: relative; height: 300px; width: 100%;">
+        <canvas #categoriesChart></canvas>
+      </div>
+
+      <!-- Mostrar mensaje cuando no hay datos -->
+      <div *ngIf="categories.length === 0" class="no-data-message">
+        <ion-icon name="information-circle-outline" size="large"></ion-icon>
+        <p>No hay datos disponibles para mostrar las categorías</p>
+      </div>
+
+      <!-- Lista de respaldo para mostrar los datos en formato simple -->
+      <ion-list *ngIf="categories.length > 0">
+        <ion-item *ngFor="let category of categories">
+          <ion-label>{{category.name}}</ion-label>
+          <ion-badge slot="end" color="primary">{{category.count}}</ion-badge>
+        </ion-item>
+      </ion-list>
+    </ion-card-content>
+  </ion-card>
+
+  <!-- Predicciones para el próximo año -->
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Predicciones para el Próximo Año</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <ion-list>
+        <ion-item *ngFor="let prediction of predictions">
+          <ion-label>
+            <h3>{{prediction.category}}</h3>
+            <p>Se espera un {{prediction.change}}% de {{prediction.trend}} respecto al año anterior</p>
+          </ion-label>
+          <ion-icon slot="end" [name]="prediction.trend === 'aumento' ? 'trending-up' : 'trending-down'"
+            [color]="prediction.trend === 'aumento' ? 'success' : 'danger'">
+          </ion-icon>
+        </ion-item>
+      </ion-list>
+      <ion-note class="prediction-note">
+        * Basado en el análisis de los últimos 6 meses y tendencias estacionales.
+      </ion-note>
+    </ion-card-content>
+  </ion-card>
+</ion-content>
