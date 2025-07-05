@@ -6,11 +6,20 @@ import { CommonModule } from '@angular/common';
 import { AutheticationService } from 'src/app/services/authetication.service';
 import { Cita } from 'src/app/models/cita.model';
 
-
+// Interfaz para mascotas
 interface Pet {
   id: string;
   name: string;
-  speciesName: string; 
+  speciesName: string;
+  userId?: string;
+}
+
+// Interfaz extendida para citas con información adicional
+interface CitaExtendida extends Cita {
+  usuarioEmail?: string;
+  usuarioNombre?: string;
+  mascotaNombre?: string;
+  mascotaEspecie?: string;
 }
 
 @Component({
@@ -27,10 +36,10 @@ export class CitasPage implements OnInit {
   veterinariosDisponibles: any[] = [];
   horariosDisponibles: string[] = [];
   mascotas: Pet[] = [];
-  citasAgendadas: Cita[] = [];
+  citasAgendadas: CitaExtendida[] = []; // Cambiado a CitaExtendida
   mostrarExito = false;
   modalDetalleVisible = false;
-  citaSeleccionada: Cita | null = null;
+  citaSeleccionada: CitaExtendida | null = null; // Cambiado a CitaExtendida
   esAdmin: boolean = false;
   currentUserId: string | null = null;
 
@@ -49,7 +58,7 @@ export class CitasPage implements OnInit {
     fecha: '',
     hora: '',
     motivo: '',
-    petId: '', 
+    petId: '',
     userId: ''
   };
 
@@ -66,6 +75,7 @@ export class CitasPage implements OnInit {
   async ngOnInit() {
     const user = this.authService.getCurrentUser();
     if (user) {
+      this.currentUserId = user.uid; 
       this.nuevaCita.userId = user.uid;
       await this.cargarMascotas();
       await this.verificarRolUsuario();
@@ -86,31 +96,121 @@ export class CitasPage implements OnInit {
     }
   }
 
-  esOwner(cita: Cita): boolean {
+  esOwner(cita: CitaExtendida): boolean {
     return cita.userId === this.currentUserId;
   }
 
+  // Método actualizado para cargar citas con información completa
   async cargarCitasAgendadas() {
-    let q;
-    if (this.esAdmin) {
-      // Admin ve todas las citas
-      q = query(collection(this.firestore, 'citas'));
-    } else {
-      // Owner solo ve sus citas
-      q = query(
-        collection(this.firestore, 'citas'),
-        where('userId', '==', this.currentUserId)
-      );
-    }
+    try {
+      let q;
+      
+      const currentUser = this.authService.getCurrentUser();
+      const userId = this.currentUserId || currentUser?.uid;
+      
+      if (!userId) {
+        console.warn('No hay usuario para cargar citas');
+        this.citasAgendadas = [];
+        return;
+      }
 
-    const querySnapshot = await getDocs(q);
-    this.citasAgendadas = querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as Cita));
+      if (this.esAdmin) {
+        // Admin ve todas las citas
+        q = query(collection(this.firestore, 'citas'));
+      } else {
+        // Owner solo ve sus citas
+        q = query(
+          collection(this.firestore, 'citas'),
+          where('userId', '==', userId)
+        );
+      }
+
+      const querySnapshot = await getDocs(q);
+      const citasBasicas = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Cita));
+      
+      // Enriquecer cada cita con información del usuario y mascota
+      this.citasAgendadas = await Promise.all(
+        citasBasicas.map(async (cita) => {
+          const citaExtendida: CitaExtendida = { ...cita };
+          
+          // Obtener información del usuario
+          try {
+            const userRef = doc(this.firestore, 'users', cita.userId);
+            const userDoc = await getDoc(userRef);
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              citaExtendida.usuarioEmail = userData['email'] || 'Email no disponible';
+              citaExtendida.usuarioNombre = userData['name'] || userData['nombre'] || 'Nombre no disponible';
+            }
+          } catch (error) {
+            console.error('Error al obtener usuario:', error);
+            citaExtendida.usuarioEmail = 'Error al cargar email';
+          }
+          
+          // Obtener información de la mascota
+          try {
+            const petRef = doc(this.firestore, 'pets', cita.petId);
+            const petDoc = await getDoc(petRef);
+            if (petDoc.exists()) {
+              const petData = petDoc.data();
+              citaExtendida.mascotaNombre = petData['name'] || 'Nombre no disponible';
+              citaExtendida.mascotaEspecie = petData['speciesName'] || 'Especie no disponible';
+            }
+          } catch (error) {
+            console.error('Error al obtener mascota:', error);
+            citaExtendida.mascotaNombre = 'Error al cargar mascota';
+          }
+          
+          return citaExtendida;
+        })
+      );
+      
+      console.log('Citas cargadas con información completa:', this.citasAgendadas.length);
+      
+    } catch (error) {
+      console.error('Error al cargar citas:', error);
+      const toast = await this.toastController.create({
+        message: 'Error al cargar las citas agendadas',
+        duration: 2000,
+        color: 'danger'
+      });
+      await toast.present();
+    }
   }
 
-  puedeVerReceta(cita: Cita): boolean {
+  // Métodos helper para obtener información en el template
+  obtenerEmailUsuario(cita: CitaExtendida): string {
+    return cita.usuarioEmail || 'Email no disponible';
+  }
+
+  obtenerNombreUsuario(cita: CitaExtendida): string {
+    return cita.usuarioNombre || 'Usuario no disponible';
+  }
+
+  obtenerInfoMascota(cita: CitaExtendida): string {
+    if (cita.mascotaNombre && cita.mascotaEspecie) {
+      return `${cita.mascotaNombre} (${cita.mascotaEspecie})`;
+    }
+    return cita.mascotaNombre || 'Mascota no disponible';
+  }
+
+  // Método actualizado para compatibilidad
+  obtenerInfoMascotaCompleta(petId: string): string {
+    // Primero buscar en las citas cargadas
+    const citaConMascota = this.citasAgendadas.find(c => c.petId === petId);
+    if (citaConMascota?.mascotaNombre) {
+      return `${citaConMascota.mascotaNombre} (${citaConMascota.mascotaEspecie})`;
+    }
+    
+    // Fallback al método original
+    const mascota = this.mascotas.find(m => m.id === petId);
+    return mascota ? `${mascota.name} (${mascota.speciesName})` : 'Mascota no disponible';
+  }
+
+  puedeVerReceta(cita: CitaExtendida): boolean {
     return this.esAdmin || cita.userId === this.currentUserId;
   }
 
@@ -124,7 +224,7 @@ export class CitasPage implements OnInit {
     return mascota ? `${mascota.name} (${mascota.speciesName})` : 'Mascota no disponible';
   }
 
-  async mostrarDetalleCita(cita: Cita) {
+  async mostrarDetalleCita(cita: CitaExtendida) {
     this.citaSeleccionada = cita;
     this.modalDetalleVisible = true;
   }
@@ -160,7 +260,7 @@ export class CitasPage implements OnInit {
     const toast = await this.toastController.create({ message, duration: 2000, color });
     await toast.present();
   }
-  
+
   async cargarVeterinariosDisponibles(fecha: string) {
     const fechaObj = new Date(fecha);
     const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
@@ -174,12 +274,10 @@ export class CitasPage implements OnInit {
 
     collectionData(q, { idField: 'id' }).subscribe((data) => {
       this.veterinariosDisponibles = data;
-      // Si había un veterinario seleccionado que ya no está disponible, lo limpiamos
       if (this.nuevaCita.veterinarioId && !this.veterinariosDisponibles.some(v => v.id === this.nuevaCita.veterinarioId)) {
         this.nuevaCita.veterinarioId = '';
         this.horariosDisponibles = [];
       }
-      // Si ya hay un veterinario seleccionado, recargar sus horarios para la nueva fecha
       if (this.nuevaCita.veterinarioId) {
         this.cargarHorariosDisponibles();
       }
@@ -199,7 +297,6 @@ export class CitasPage implements OnInit {
     const veterinario = this.veterinariosDisponibles.find(v => v.id === this.nuevaCita.veterinarioId);
 
     if (veterinario && veterinario.horariosLaborales && veterinario.horariosLaborales[diaSemana]) {
-      // Filtrar horarios que no estén ya ocupados en otras citas
       this.horariosDisponibles = await this.filtrarHorariosOcupados(
         veterinario.horariosLaborales[diaSemana],
         this.nuevaCita.veterinarioId,
@@ -212,7 +309,6 @@ export class CitasPage implements OnInit {
 
   async filtrarHorariosOcupados(horarios: string[], veterinarioId: string, fecha: string): Promise<string[]> {
     try {
-      // Convertir la fecha a formato ISO (YYYY-MM-DD) para comparación
       const fechaFormateada = new Date(fecha).toISOString().split('T')[0];
 
       const citasRef = collection(this.firestore, 'citas');
@@ -228,15 +324,15 @@ export class CitasPage implements OnInit {
       return horarios.filter(hora => !horariosOcupados.includes(hora));
     } catch (error) {
       console.error('Error al filtrar horarios:', error);
-      return horarios; // Si hay error, mostramos todos los horarios
+      return horarios;
     }
   }
 
   actualizarFechaCita(event: any) {
     this.nuevaCita.fecha = new Date(event.detail.value).toISOString().split('T')[0];
     this.cargarVeterinariosDisponibles(this.nuevaCita.fecha);
-    this.nuevaCita.veterinarioId = ''; // Resetear veterinario al cambiar fecha
-    this.nuevaCita.hora = ''; // Resetear hora al cambiar fecha
+    this.nuevaCita.veterinarioId = '';
+    this.nuevaCita.hora = '';
     this.horariosDisponibles = [];
   }
 
@@ -257,7 +353,7 @@ export class CitasPage implements OnInit {
           id: doc.id,
           name: data['name'],
           speciesName: data['speciesName'],
-          userId: data['userId'] // Asegurar que userId está incluido
+          userId: data['userId']
         } as Pet;
       });
     } catch (error) {
@@ -276,7 +372,7 @@ export class CitasPage implements OnInit {
       !!this.nuevaCita.fecha &&
       !!this.nuevaCita.hora &&
       !!this.nuevaCita.motivo &&
-      !!this.nuevaCita.petId; // Validación agregada para petId
+      !!this.nuevaCita.petId;
   }
 
   async crearCita() {
@@ -291,7 +387,6 @@ export class CitasPage implements OnInit {
         return;
       }
 
-      // Asegurar que la fecha esté en formato ISO (YYYY-MM-DD)
       this.nuevaCita.fecha = new Date(this.nuevaCita.fecha).toISOString().split('T')[0];
 
       const citasRef = collection(this.firestore, 'citas');
@@ -299,6 +394,9 @@ export class CitasPage implements OnInit {
 
       this.mostrarExito = true;
       this.resetForm();
+      
+      // Recargar las citas para mostrar la nueva
+      await this.cargarCitasAgendadas();
     } catch (error) {
       console.error('Error al crear cita:', error);
       const toast = await this.toastController.create({
@@ -316,11 +414,20 @@ export class CitasPage implements OnInit {
       fecha: '',
       hora: '',
       motivo: '',
-      petId: '', // Asegúrate de resetear petId
-      userId: this.authService.getCurrentUser()?.uid || '' // Mantén el userId si está logueado
+      petId: '',
+      userId: this.authService.getCurrentUser()?.uid || ''
     };
     this.fechaSeleccionada = new Date().toISOString();
     this.horariosDisponibles = [];
-    this.cargarVeterinariosDisponibles(this.fechaSeleccionada); // Recarga veterinarios al resetear
+    this.cargarVeterinariosDisponibles(this.fechaSeleccionada);
+  }
+
+  // Método de debug opcional
+  async debugInfo() {
+    console.log('=== DEBUG INFO ===');
+    console.log('currentUserId:', this.currentUserId);
+    console.log('esAdmin:', this.esAdmin);
+    console.log('citasAgendadas:', this.citasAgendadas);
+    console.log('==================');
   }
 }
