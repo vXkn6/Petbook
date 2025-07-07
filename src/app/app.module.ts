@@ -1,6 +1,7 @@
 import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { RouteReuseStrategy } from '@angular/router';
+import { HttpClientModule } from '@angular/common/http';
 
 import { IonicModule, IonicRouteStrategy } from '@ionic/angular';
 
@@ -19,7 +20,7 @@ import { getStorage } from 'firebase/storage';
 
 @NgModule({
   declarations: [AppComponent],
-  imports: [BrowserModule, IonicModule.forRoot({mode:'ios'}), AppRoutingModule,],
+  imports: [BrowserModule, IonicModule.forRoot({mode:'ios'}), AppRoutingModule,HttpClientModule, ],
   providers: [{ provide: RouteReuseStrategy, useClass: IonicRouteStrategy, },
     provideFirebaseApp(() => initializeApp(environment.firebaseConfig)),
     provideAuth(() => getAuth()),
@@ -29,3 +30,7 @@ import { getStorage } from 'firebase/storage';
   bootstrap: [AppComponent],
 })
 export class AppModule {}
+
+
+
+

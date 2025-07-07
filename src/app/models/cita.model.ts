@@ -12,6 +12,7 @@ export interface Cita {
   fechaCreacion: Date;
   recetaBase64?: string; // Cambiamos a base64 string
   vetName?: string;
+  motivoCancelacion?: string;
 }
 
 // Tipo para el estado de la cita

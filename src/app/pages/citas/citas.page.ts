@@ -1,10 +1,14 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
-import { IonicModule, ToastController } from '@ionic/angular';
-import { Firestore, collection, collectionData, doc, addDoc, query, where, getDocs, updateDoc, getDoc } from '@angular/fire/firestore';
+import { IonicModule, ToastController, AlertController } from '@ionic/angular';
+import { Firestore, collection, collectionData, doc, addDoc, query, where, getDocs, updateDoc, getDoc, deleteDoc } from '@angular/fire/firestore';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { AutheticationService } from 'src/app/services/authetication.service';
 import { Cita } from 'src/app/models/cita.model';
+import OneSignal from 'onesignal-cordova-plugin';
+import { HttpClient } from '@angular/common/http';
+import { environment } from 'src/environments/environment';
+
 
 // Interfaz para mascotas
 interface Pet {
@@ -69,13 +73,15 @@ export class CitasPage implements OnInit {
   constructor(
     private firestore: Firestore,
     private toastController: ToastController,
-    private authService: AutheticationService
+    private authService: AutheticationService,
+    private alertController: AlertController,
+    private http: HttpClient,
   ) { }
 
   async ngOnInit() {
     const user = this.authService.getCurrentUser();
     if (user) {
-      this.currentUserId = user.uid; 
+      this.currentUserId = user.uid;
       this.nuevaCita.userId = user.uid;
       await this.cargarMascotas();
       await this.verificarRolUsuario();
@@ -104,10 +110,10 @@ export class CitasPage implements OnInit {
   async cargarCitasAgendadas() {
     try {
       let q;
-      
+
       const currentUser = this.authService.getCurrentUser();
       const userId = this.currentUserId || currentUser?.uid;
-      
+
       if (!userId) {
         console.warn('No hay usuario para cargar citas');
         this.citasAgendadas = [];
@@ -130,12 +136,12 @@ export class CitasPage implements OnInit {
         id: doc.id,
         ...doc.data()
       } as Cita));
-      
+
       // Enriquecer cada cita con información del usuario y mascota
       this.citasAgendadas = await Promise.all(
         citasBasicas.map(async (cita) => {
           const citaExtendida: CitaExtendida = { ...cita };
-          
+
           // Obtener información del usuario
           try {
             const userRef = doc(this.firestore, 'users', cita.userId);
@@ -149,7 +155,7 @@ export class CitasPage implements OnInit {
             console.error('Error al obtener usuario:', error);
             citaExtendida.usuarioEmail = 'Error al cargar email';
           }
-          
+
           // Obtener información de la mascota
           try {
             const petRef = doc(this.firestore, 'pets', cita.petId);
@@ -163,13 +169,13 @@ export class CitasPage implements OnInit {
             console.error('Error al obtener mascota:', error);
             citaExtendida.mascotaNombre = 'Error al cargar mascota';
           }
-          
+
           return citaExtendida;
         })
       );
-      
+
       console.log('Citas cargadas con información completa:', this.citasAgendadas.length);
-      
+
     } catch (error) {
       console.error('Error al cargar citas:', error);
       const toast = await this.toastController.create({
@@ -204,7 +210,7 @@ export class CitasPage implements OnInit {
     if (citaConMascota?.mascotaNombre) {
       return `${citaConMascota.mascotaNombre} (${citaConMascota.mascotaEspecie})`;
     }
-    
+
     // Fallback al método original
     const mascota = this.mascotas.find(m => m.id === petId);
     return mascota ? `${mascota.name} (${mascota.speciesName})` : 'Mascota no disponible';
@@ -394,7 +400,7 @@ export class CitasPage implements OnInit {
 
       this.mostrarExito = true;
       this.resetForm();
-      
+
       // Recargar las citas para mostrar la nueva
       await this.cargarCitasAgendadas();
     } catch (error) {
@@ -429,5 +435,92 @@ export class CitasPage implements OnInit {
     console.log('esAdmin:', this.esAdmin);
     console.log('citasAgendadas:', this.citasAgendadas);
     console.log('==================');
+  }
+
+  async confirmarCancelacion(cita: any) {
+    const alert = await this.alertController.create({
+      header: 'Cancelar cita',
+      message: 'Por favor, ingresa el motivo de la cancelación',
+      inputs: [
+        {
+          name: 'motivo',
+          type: 'textarea',
+          placeholder: 'Ej: Veterinario no disponible'
+        }
+      ],
+      buttons: [
+        {
+          text: 'Cancelar',
+          role: 'cancel'
+        },
+        {
+          text: 'Confirmar',
+          handler: data => {
+            const motivo = data.motivo?.trim();
+            if (motivo) {
+              this.cancelarCita(cita, motivo);
+              return true; // ← esto evita el error
+            } else {
+              this.mostrarToast('Debes ingresar un motivo', 'warning');
+              return false;
+            }
+          }
+        }
+      ]
+    });
+
+    await alert.present();
+  }
+
+  async cancelarCita(cita: any, motivo: string) {
+    try {
+      const citaRef = doc(this.firestore, 'citas', cita.id);
+      await updateDoc(citaRef, {
+        estado: 'cancelada',
+        motivoCancelacion: motivo // Nuevo campo en el documento
+      });
+
+      this.mostrarToast('Cita cancelada exitosamente', 'success');
+
+      // Enviar notificación si es admin
+      if (this.esAdmin && cita.userId) {
+        this.enviarNotificacionCancelacion(cita.userId, cita, motivo);
+      }
+
+      // Actualizar lista
+      this.cargarCitasAgendadas();
+
+    } catch (error) {
+      console.error('Error al cancelar cita:', error);
+      this.mostrarToast('Error al cancelar cita', 'danger');
+    }
+  }
+
+  enviarNotificacionCancelacion(userId: string, cita: any, motivo: string) {
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': environment.onesignal.restApiKey
+    };
+
+    const body = {
+      app_id: environment.onesignal.appId,
+      include_external_user_ids: [userId],
+      channel_for_external_user_ids: 'push',
+      headings: { en: 'Cita cancelada' },
+      contents: {
+        en: `Tu cita del ${cita.fecha} a las ${cita.hora} fue cancelada por la Veterinaria .\nMotivo: ${motivo}`
+      }
+    };
+
+    this.http.post('https://onesignal.com/api/v1/notifications', body, { headers })
+      .subscribe({
+        next: () => console.log('✅ Notificación enviada'),
+        error: (err) => console.error('❌ Error al enviar notificación', err)
+      });
+  }
+  refrescarCitasEvent(event: any) {
+    this.cargarCitasAgendadas().then(() => {
+      event.target.complete(); // Finaliza la animación
+    });
   }
 }

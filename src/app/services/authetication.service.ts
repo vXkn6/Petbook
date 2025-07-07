@@ -1,9 +1,9 @@
 import { Injectable, inject } from '@angular/core';
-import { 
-  Auth, 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
-  signOut, 
+import {
+  Auth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
   authState,
   sendPasswordResetEmail,
   UserCredential
@@ -12,15 +12,16 @@ import { Firestore, collection, doc, setDoc } from '@angular/fire/firestore';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { Router } from '@angular/router';
+import OneSignal from 'onesignal-cordova-plugin';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AutheticationService {
- private auth: Auth = inject(Auth);
-   private firestore: Firestore = inject(Firestore);
+  private auth: Auth = inject(Auth);
+  private firestore: Firestore = inject(Firestore);
   private router: Router = inject(Router);
-  
+
   private authState = new BehaviorSubject<boolean>(false);
   currentUser$ = authState(this.auth);
   isAuthenticated$ = this.currentUser$.pipe(map(user => !!user));
@@ -44,7 +45,7 @@ export class AutheticationService {
       throw error;
     }
   }
-  
+
   async saveUserData(uid: string, email: string, displayName?: string): Promise<void> {
     try {
       const usersCollectionRef = collection(this.firestore, 'users'); // Referencia a la colección 'users'
@@ -63,12 +64,29 @@ export class AutheticationService {
       throw error;
     }
   }
+  private isOneSignalAvailable(): boolean {
+    return typeof window !== 'undefined' &&
+      typeof (window as any).cordova !== 'undefined' &&
+      typeof OneSignal !== 'undefined' &&
+      typeof OneSignal.login === 'function';
+  }
 
   // Método para iniciar sesión
   async login(email: string, password: string): Promise<any> {
     try {
       const userCredential = await signInWithEmailAndPassword(this.auth, email, password);
+
+      // Obtener el UID del usuario autenticado
+      const userId = userCredential.user.uid;
+
+      if (this.isOneSignalAvailable()) {
+        OneSignal.login(userId);
+      }
+      OneSignal.User.getExternalId().then(id => console.log('🧾 Usuario actual OneSignal:', id));
+
+      // Redireccionar
       this.router.navigate(['/home']);
+
       return userCredential;
     } catch (error) {
       throw error;
@@ -79,6 +97,10 @@ export class AutheticationService {
   async logout(): Promise<void> {
     try {
       await signOut(this.auth);
+
+      if (this.isOneSignalAvailable() && typeof OneSignal.logout === 'function') {
+        OneSignal.logout();
+      }
       this.router.navigate(['/login']);
     } catch (error) {
       throw error;

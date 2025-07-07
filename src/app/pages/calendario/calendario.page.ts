@@ -1,7 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import { AlertController, ToastController, ModalController } from '@ionic/angular';
-import { Firestore, collection, addDoc, updateDoc, deleteDoc, doc, collectionData, query, orderBy } from '@angular/fire/firestore';
+import { Firestore, collection, addDoc, updateDoc, deleteDoc, doc, collectionData, query, orderBy, where } from '@angular/fire/firestore';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { AutheticationService } from 'src/app/services/authetication.service';
 
 export interface Recordatorio {
   id?: string;
@@ -10,6 +11,7 @@ export interface Recordatorio {
   descripcion: string;
   timestamp: number;   // Timestamp en UTC
   notificationId?: number;
+  userId: string;
 }
 
 @Component({
@@ -23,12 +25,14 @@ export class CalendarioPage implements OnInit {
   recordatorios: Recordatorio[] = [];
   recordatoriosFiltrados: Recordatorio[] = [];
   loading = true;
+  userId: string | null = null;
 
   constructor(
     private alertController: AlertController,
     private toastController: ToastController,
     private modalController: ModalController,
-    private firestore: Firestore
+    private firestore: Firestore,
+    private authService: AutheticationService
   ) {
     // Establecer fecha actual en formato local (YYYY-MM-DD)
     const hoy = new Date();
@@ -38,6 +42,16 @@ export class CalendarioPage implements OnInit {
   async ngOnInit() {
     await this.requestNotificationPermissions();
     this.cargarRecordatorios();
+
+    const user = this.authService.getCurrentUser();
+    if (user) {
+      this.userId = user.uid;
+      this.cargarRecordatorios();
+    } else {
+      this.userId = null;
+      this.recordatorios = [];
+      this.recordatoriosFiltrados = [];
+    }
   }
 
   // 🔄 Formatear fecha local (YYYY-MM-DD)
@@ -60,7 +74,7 @@ export class CalendarioPage implements OnInit {
         localDate.getMinutes()
       )
     );
-    
+
     return {
       dateUTC: utcDate.toISOString().split('T')[0], // Fecha UTC (YYYY-MM-DD)
       timestampUTC: utcDate.getTime()               // Timestamp UTC
@@ -77,18 +91,31 @@ export class CalendarioPage implements OnInit {
   }
 
   // 📥 Cargar recordatorios desde Firebase
+
   cargarRecordatorios() {
+    if (!this.userId) {
+      this.recordatorios = [];
+      this.recordatoriosFiltrados = [];
+      return;
+    }
+
     this.loading = true;
     const recordatoriosRef = collection(this.firestore, 'recordatorios');
-    const q = query(recordatoriosRef, orderBy('timestamp', 'asc'));
-    
+
+    // Filtrar por userId
+    const q = query(
+      recordatoriosRef,
+      where('userId', '==', this.userId),
+      orderBy('timestamp', 'asc')
+    );
+
     collectionData(q, { idField: 'id' }).subscribe({
       next: (recordatorios: any[]) => {
         this.recordatorios = recordatorios.map(r => ({
           ...r,
           fecha: r.fecha.split('T')[0] // Normalizar formato
         })) as Recordatorio[];
-        
+
         this.filtrarRecordatoriosPorFecha();
         this.loading = false;
       },
@@ -118,7 +145,7 @@ export class CalendarioPage implements OnInit {
 
     // Convertir fecha seleccionada a UTC para comparación
     const { dateUTC } = this.convertToUTC(this.fechaSeleccionada, '00:00');
-    
+
     this.recordatoriosFiltrados = this.recordatorios.filter(
       recordatorio => recordatorio.fecha === dateUTC
     );
@@ -165,6 +192,11 @@ export class CalendarioPage implements OnInit {
 
   // 💾 Guardar recordatorio en Firebase
   async guardarRecordatorio(hora: string, descripcion: string) {
+    if (!this.userId) {
+      this.mostrarToast('Debes iniciar sesión para crear recordatorios', 'warning');
+      return;
+    }
+
     try {
       const { dateUTC, timestampUTC } = this.convertToUTC(this.fechaSeleccionada, hora);
       const notificationId = Date.now();
@@ -174,7 +206,8 @@ export class CalendarioPage implements OnInit {
         hora: hora,
         descripcion: descripcion,
         timestamp: timestampUTC,
-        notificationId: notificationId
+        notificationId: notificationId,
+        userId: this.userId  // Añadir el ID del usuario
       };
 
       // Guardar en Firebase
@@ -199,7 +232,7 @@ export class CalendarioPage implements OnInit {
   async programarNotificacion(recordatorio: Recordatorio) {
     try {
       const fechaNotificacion = new Date(`${recordatorio.fecha}T${recordatorio.hora}`);
-      
+
       if (fechaNotificacion > new Date()) {
         await LocalNotifications.schedule({
           notifications: [
@@ -263,6 +296,11 @@ export class CalendarioPage implements OnInit {
 
   // 🔄 Actualizar recordatorio en Firebase
   async actualizarRecordatorio(id: string, hora: string, descripcion: string, notificationId: number) {
+    if (!this.userId) {
+      this.mostrarToast('Debes iniciar sesión para editar recordatorios', 'warning');
+      return;
+    }
+
     try {
       const { dateUTC, timestampUTC } = this.convertToUTC(this.fechaSeleccionada, hora);
 
@@ -270,7 +308,8 @@ export class CalendarioPage implements OnInit {
         fecha: dateUTC,
         hora: hora,
         descripcion: descripcion,
-        timestamp: timestampUTC
+        timestamp: timestampUTC,
+        userId: this.userId  // Mantener el ID del usuario
       };
 
       // Actualizar en Firebase
@@ -315,8 +354,8 @@ export class CalendarioPage implements OnInit {
 
               // Cancelar notificación
               if (recordatorio.notificationId) {
-                await LocalNotifications.cancel({ 
-                  notifications: [{ id: recordatorio.notificationId }] 
+                await LocalNotifications.cancel({
+                  notifications: [{ id: recordatorio.notificationId }]
                 });
               }
 
@@ -358,7 +397,7 @@ export class CalendarioPage implements OnInit {
     // Solución definitiva: usar componentes de fecha directamente
     const [year, month, day] = fechaUTC.split('-').map(Number);
     const fechaLocal = new Date(year, month - 1, day);
-    
+
     return fechaLocal.toLocaleDateString('es-ES', {
       weekday: 'long',
       year: 'numeric',

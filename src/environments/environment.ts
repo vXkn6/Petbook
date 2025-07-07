@@ -3,6 +3,12 @@
 // The list of file replacements can be found in `angular.json`.
 export const environment = {
   production: false,
+
+  onesignal:{
+    appId:'9141991d-adbd-4e0b-9563-b830d248fb82',
+    restApiKey:'os_v2_app_sfazshnnxvhaxfldxaynesh3qlqxcgwzamouj2nmrug75hwaxuzkux5i5pqosdj2aygwbn5qo7wmwu5o3giburbyygej3oma33g2bfy',
+  },
+  
   firebaseConfig: {
   apiKey: "AIzaSyAeoii63oIcz73D32U36ffwsl_ZM1WstWU",
   authDomain: "mi-proyecto-ffac6.firebaseapp.com",

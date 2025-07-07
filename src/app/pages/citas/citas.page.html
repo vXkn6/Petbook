@@ -81,9 +81,12 @@
           <ion-card-title>
             <ion-icon name="calendar" color="primary"></ion-icon>
             {{cita.fecha | date}} - {{cita.hora}}
+            <ion-chip color="danger" *ngIf="cita.estado === 'cancelada'">
+              <ion-label>Cancelada</ion-label>
+            </ion-chip>
           </ion-card-title>
         </ion-card-header>
-        
+
         <ion-card-content>
           <!-- Información del cliente (solo para admin) -->
           <div *ngIf="esAdmin" class="info-section">
@@ -91,59 +94,66 @@
             <p><strong>Nombre:</strong> {{obtenerNombreUsuario(cita)}}</p>
             <p><strong>Email:</strong> {{obtenerEmailUsuario(cita)}}</p>
           </div>
-          
+
           <!-- Información de la mascota -->
           <div class="info-section">
             <h3><ion-icon name="paw" color="secondary"></ion-icon> Mascota</h3>
             <p><strong>Paciente:</strong> {{obtenerInfoMascota(cita)}}</p>
           </div>
-          
+
           <!-- Información del veterinario -->
           <div class="info-section">
             <h3><ion-icon name="medical" color="tertiary"></ion-icon> Veterinario</h3>
             <p><strong>Doctor:</strong> {{obtenerNombreVeterinario(cita.veterinarioId)}}</p>
           </div>
-          
+
           <!-- Motivo de la cita -->
           <div class="info-section">
             <h3><ion-icon name="clipboard" color="medium"></ion-icon> Motivo</h3>
             <p>{{cita.motivo}}</p>
           </div>
-          
+
+          <div *ngIf="cita.estado === 'cancelada' && cita.motivoCancelacion">
+            <h4>Motivo de Cancelación:</h4>
+            <p>{{ cita.motivoCancelacion }}</p>
+          </div>
+
           <!-- Botones de acción -->
           <div class="action-buttons">
-            <ion-button 
-              fill="outline" 
-              size="small" 
-              (click)="mostrarDetalleCita(cita)">
+            <ion-button fill="outline" size="small" (click)="mostrarDetalleCita(cita)">
               <ion-icon name="eye" slot="start"></ion-icon>
               Ver Detalles
             </ion-button>
-            
-            <ion-button 
-              *ngIf="esAdmin && !cita.recetaBase64" 
-              fill="outline" 
-              size="small" 
-              color="warning"
+
+            <ion-button *ngIf="esAdmin && !cita.recetaBase64" fill="outline" size="small" color="warning"
               (click)="mostrarDetalleCita(cita)">
               <ion-icon name="document-attach" slot="start"></ion-icon>
               Subir Receta
             </ion-button>
-            
-            <ion-button 
-              *ngIf="puedeVerReceta(cita) && cita.recetaBase64" 
-              fill="outline" 
-              size="small" 
-              color="success"
+
+            <ion-button *ngIf="puedeVerReceta(cita) && cita.recetaBase64" fill="outline" size="small" color="success"
               (click)="mostrarDetalleCita(cita)">
               <ion-icon name="document-text" slot="start"></ion-icon>
               Ver Receta
             </ion-button>
+
+            <ion-button *ngIf="cita.estado !== 'cancelada' && esAdmin" fill="outline" size="small" color="danger"
+              (click)="confirmarCancelacion(cita)">
+              <ion-icon name="close-circle" slot="start"></ion-icon>
+              Cancelar
+            </ion-button>
+
+            <ion-button *ngIf="cita.estado !== 'cancelada' && !esAdmin" fill="outline" size="small" color="danger"
+              (click)="confirmarCancelacion(cita)">
+              <ion-icon name="close-circle" slot="start"></ion-icon>
+              Cancelar
+            </ion-button>
+
           </div>
         </ion-card-content>
       </ion-card>
     </div>
-    
+
     <!-- Mensaje cuando no hay citas -->
     <div *ngIf="citasAgendadas.length === 0" class="no-citas">
       <ion-card>
@@ -173,7 +183,7 @@
             <ion-card-title>{{ citaSeleccionada.petName }}</ion-card-title>
             <ion-card-subtitle>{{ citaSeleccionada.vetName }}</ion-card-subtitle>
           </ion-card-header>
-          
+
           <ion-card-content>
             <p><strong>Fecha:</strong> {{ citaSeleccionada.fecha | date }}</p>
             <p><strong>Hora:</strong> {{ citaSeleccionada.hora }}</p>
@@ -182,9 +192,8 @@
             <!-- Sección de receta -->
             <div *ngIf="puedeVerReceta(citaSeleccionada)">
               <h3>Receta Médica</h3>
-              <ion-img *ngIf="citaSeleccionada.recetaBase64" 
-                      [src]="'data:image/jpeg;base64,' + citaSeleccionada.recetaBase64"
-                      style="max-height: 300px;"></ion-img>
+              <ion-img *ngIf="citaSeleccionada.recetaBase64"
+                [src]="'data:image/jpeg;base64,' + citaSeleccionada.recetaBase64" style="max-height: 300px;"></ion-img>
               <p *ngIf="!citaSeleccionada.recetaBase64">No hay receta disponible</p>
             </div>
 
@@ -202,4 +211,9 @@
   <ion-toast [isOpen]="mostrarExito" message="Cita agendada correctamente" duration="2000"
     (didDismiss)="mostrarExito = false">
   </ion-toast>
+  
+  <ion-refresher slot="fixed" (ionRefresh)="refrescarCitasEvent($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+  
 </ion-content>

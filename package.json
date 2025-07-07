@@ -22,6 +22,7 @@
     "@angular/platform-browser": "^20.0.0",
     "@angular/platform-browser-dynamic": "^20.0.0",
     "@angular/router": "^20.0.0",
+    "@awesome-cordova-plugins/onesignal": "^8.0.2",
     "@capacitor/android": "7.4.0",
     "@capacitor/app": "7.0.1",
     "@capacitor/camera": "^7.0.1",
@@ -37,6 +38,7 @@
     "date-fns": "^4.1.0",
     "firebase": "^11.9.1",
     "ionicons": "^7.0.0",
+    "onesignal-cordova-plugin": "^5.2.15",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
     "zone.js": "~0.15.0"
