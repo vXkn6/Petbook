@@ -17,7 +17,6 @@
     </ion-segment-button>
   </ion-segment>
 
-  <!-- SECCIÓN NUEVA CITA (Sin cambios) -->
   <div *ngIf="viewMode === 'nueva'">
     <form (ngSubmit)="crearCita()">
       <ion-item>
@@ -73,7 +72,6 @@
     </form>
   </div>
 
-  <!-- SECCIÓN CITAS AGENDADAS (MEJORADA) -->
   <div *ngIf="viewMode === 'agendadas'">
     <div *ngFor="let cita of citasAgendadas" class="cita-card">
       <ion-card>
@@ -81,80 +79,83 @@
           <ion-card-title>
             <ion-icon name="calendar" color="primary"></ion-icon>
             {{cita.fecha | date}} - {{cita.hora}}
-            <ion-chip color="danger" *ngIf="cita.estado === 'cancelada'">
-              <ion-label>Cancelada</ion-label>
-            </ion-chip>
           </ion-card-title>
         </ion-card-header>
-
+        
         <ion-card-content>
-          <!-- Información del cliente (solo para admin) -->
           <div *ngIf="esAdmin" class="info-section">
             <h3><ion-icon name="person" color="primary"></ion-icon> Cliente</h3>
             <p><strong>Nombre:</strong> {{obtenerNombreUsuario(cita)}}</p>
             <p><strong>Email:</strong> {{obtenerEmailUsuario(cita)}}</p>
           </div>
-
-          <!-- Información de la mascota -->
+          
           <div class="info-section">
             <h3><ion-icon name="paw" color="secondary"></ion-icon> Mascota</h3>
             <p><strong>Paciente:</strong> {{obtenerInfoMascota(cita)}}</p>
           </div>
-
-          <!-- Información del veterinario -->
+          
           <div class="info-section">
             <h3><ion-icon name="medical" color="tertiary"></ion-icon> Veterinario</h3>
             <p><strong>Doctor:</strong> {{obtenerNombreVeterinario(cita.veterinarioId)}}</p>
           </div>
-
-          <!-- Motivo de la cita -->
+          
           <div class="info-section">
             <h3><ion-icon name="clipboard" color="medium"></ion-icon> Motivo</h3>
             <p>{{cita.motivo}}</p>
           </div>
-
-          <div *ngIf="cita.estado === 'cancelada' && cita.motivoCancelacion">
-            <h4>Motivo de Cancelación:</h4>
-            <p>{{ cita.motivoCancelacion }}</p>
+          
+          <div *ngIf="cita.estado === 'cancelada'" class="info-section cancelled-status">
+            <h3><ion-icon name="alert-circle" color="danger"></ion-icon> Estado</h3>
+            <ion-text color="danger">
+              <p><strong>¡Cita Cancelada!</strong></p>
+              <p><strong>Motivo:</strong> {{ cita.motivoCancelacion || 'No especificado' }}</p>
+              <p>Por favor, **contáctenos** para más información.</p>
+            </ion-text>
           </div>
 
-          <!-- Botones de acción -->
           <div class="action-buttons">
-            <ion-button fill="outline" size="small" (click)="mostrarDetalleCita(cita)">
+            <ion-button 
+              fill="outline" 
+              size="small" 
+              (click)="mostrarDetalleCita(cita)">
               <ion-icon name="eye" slot="start"></ion-icon>
               Ver Detalles
             </ion-button>
-
-            <ion-button *ngIf="esAdmin && !cita.recetaBase64" fill="outline" size="small" color="warning"
+            
+            <ion-button 
+              *ngIf="esAdmin && !cita.recetaBase64 && cita.estado !== 'cancelada'" 
+              fill="outline" 
+              size="small" 
+              color="warning"
               (click)="mostrarDetalleCita(cita)">
               <ion-icon name="document-attach" slot="start"></ion-icon>
               Subir Receta
             </ion-button>
-
-            <ion-button *ngIf="puedeVerReceta(cita) && cita.recetaBase64" fill="outline" size="small" color="success"
+            
+            <ion-button 
+              *ngIf="puedeVerReceta(cita) && cita.recetaBase64" 
+              fill="outline" 
+              size="small" 
+              color="success"
               (click)="mostrarDetalleCita(cita)">
               <ion-icon name="document-text" slot="start"></ion-icon>
               Ver Receta
             </ion-button>
 
-            <ion-button *ngIf="cita.estado !== 'cancelada' && esAdmin" fill="outline" size="small" color="danger"
-              (click)="confirmarCancelacion(cita)">
-              <ion-icon name="close-circle" slot="start"></ion-icon>
-              Cancelar
+            <ion-button 
+              *ngIf="esAdmin && cita.estado !== 'cancelada'" 
+              fill="solid" 
+              size="small" 
+              color="danger"
+              (click)="cancelarCita(cita)">
+              <ion-icon name="close-circle-outline" slot="start"></ion-icon>
+              Cancelar Cita
             </ion-button>
-
-            <ion-button *ngIf="cita.estado !== 'cancelada' && !esAdmin" fill="outline" size="small" color="danger"
-              (click)="confirmarCancelacion(cita)">
-              <ion-icon name="close-circle" slot="start"></ion-icon>
-              Cancelar
-            </ion-button>
-
           </div>
         </ion-card-content>
       </ion-card>
     </div>
-
-    <!-- Mensaje cuando no hay citas -->
+    
     <div *ngIf="citasAgendadas.length === 0" class="no-citas">
       <ion-card>
         <ion-card-content class="ion-text-center">
@@ -166,14 +167,13 @@
     </div>
   </div>
 
-  <!-- MODAL DETALLE CITA (Sin cambios) -->
-  <ion-modal [isOpen]="modalDetalleVisible" (didDismiss)="modalDetalleVisible = false">
+  <ion-modal [isOpen]="modalDetalleVisible" (didDismiss)="cerrarModal()">
     <ng-template>
       <ion-header>
         <ion-toolbar>
           <ion-title>Detalle Cita</ion-title>
           <ion-buttons slot="end">
-            <ion-button (click)="modalDetalleVisible = false">Cerrar</ion-button>
+            <ion-button (click)="cerrarModal()">Cerrar</ion-button>
           </ion-buttons>
         </ion-toolbar>
       </ion-header>
@@ -183,25 +183,42 @@
             <ion-card-title>{{ citaSeleccionada.petName }}</ion-card-title>
             <ion-card-subtitle>{{ citaSeleccionada.vetName }}</ion-card-subtitle>
           </ion-card-header>
-
+          
           <ion-card-content>
             <p><strong>Fecha:</strong> {{ citaSeleccionada.fecha | date }}</p>
             <p><strong>Hora:</strong> {{ citaSeleccionada.hora }}</p>
             <p><strong>Motivo:</strong> {{ citaSeleccionada.motivo }}</p>
 
-            <!-- Sección de receta -->
+            <div *ngIf="citaSeleccionada.estado === 'cancelada'" class="info-section cancelled-status">
+              <h3><ion-icon name="alert-circle" color="danger"></ion-icon> Estado de la Cita</h3>
+              <ion-text color="danger">
+                <p><strong>¡Cita Cancelada!</strong></p>
+                <p><strong>Motivo:</strong> {{ citaSeleccionada.motivoCancelacion || 'No especificado' }}</p>
+                <p>Por favor, **contáctenos** para más información.</p>
+              </ion-text>
+            </div>
+
             <div *ngIf="puedeVerReceta(citaSeleccionada)">
               <h3>Receta Médica</h3>
-              <ion-img *ngIf="citaSeleccionada.recetaBase64"
-                [src]="'data:image/jpeg;base64,' + citaSeleccionada.recetaBase64" style="max-height: 300px;"></ion-img>
+              <ion-img *ngIf="citaSeleccionada.recetaBase64" 
+                    [src]="'data:image/jpeg;base64,' + citaSeleccionada.recetaBase64"
+                    style="max-height: 300px;"></ion-img>
               <p *ngIf="!citaSeleccionada.recetaBase64">No hay receta disponible</p>
             </div>
 
-            <!-- Botón para subir receta (solo admin) -->
-            <ion-button *ngIf="esAdmin" expand="block" (click)="fileInput.click()">
+            <ion-button *ngIf="esAdmin && citaSeleccionada.estado !== 'cancelada'" expand="block" (click)="fileInput.click()">
               Subir Receta
             </ion-button>
             <input type="file" #fileInput hidden accept="image/*" (change)="subirReceta($event)">
+
+            <ion-button 
+              *ngIf="esAdmin && citaSeleccionada.estado !== 'cancelada'" 
+              expand="block" 
+              color="danger" 
+              (click)="cancelarCita(citaSeleccionada)">
+              <ion-icon name="close-circle-outline" slot="start"></ion-icon>
+              Cancelar Cita
+            </ion-button>
           </ion-card-content>
         </ion-card>
       </ion-content>
@@ -211,9 +228,83 @@
   <ion-toast [isOpen]="mostrarExito" message="Cita agendada correctamente" duration="2000"
     (didDismiss)="mostrarExito = false">
   </ion-toast>
-  
-  <ion-refresher slot="fixed" (ionRefresh)="refrescarCitasEvent($event)">
-    <ion-refresher-content></ion-refresher-content>
-  </ion-refresher>
-  
 </ion-content>
+
+<style>
+/* Estilos existentes */
+.cita-card {
+  margin: 10px 0;
+}
+
+.info-section {
+  margin-bottom: 15px;
+  padding: 10px;
+  border-left: 3px solid var(--ion-color-primary);
+  background-color: var(--ion-color-light);
+}
+
+.info-section h3 {
+  margin: 0 0 8px 0;
+  font-size: 1rem;
+  color: var(--ion-color-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.info-section p {
+  margin: 5px 0;
+  color: var(--ion-color-dark);
+}
+
+.action-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+  flex-wrap: wrap;
+}
+
+.no-citas {
+  margin: 20px;
+}
+
+.no-citas ion-icon {
+  margin-bottom: 10px;
+}
+
+.no-citas h2 {
+  color: var(--ion-color-medium);
+}
+
+.no-citas p {
+  color: var(--ion-color-medium);
+}
+
+/* Estilos diferenciados por sección con colores suaves */
+.info-section:first-child {
+  border-left-color: var(--ion-color-primary);
+  background-color: rgba(56, 128, 255, 0.1);
+}
+
+.info-section:nth-child(2) {
+  border-left-color: var(--ion-color-secondary);
+  background-color: rgba(16, 220, 96, 0.1);
+}
+
+.info-section:nth-child(3) {
+  border-left-color: var(--ion-color-tertiary);
+  background-color: rgba(255, 206, 0, 0.1);
+}
+
+.info-section:nth-child(4) {
+  border-left-color: var(--ion-color-medium);
+  background-color: rgba(146, 148, 151, 0.1);
+}
+
+/* **NUEVO ESTILO: Para el estado de cita cancelada** */
+.cancelled-status {
+  border-left: 3px solid var(--ion-color-danger) !important;
+  background-color: rgba(235, 68, 90, 0.1) !important;
+  margin-top: 15px;
+}
+</style>
