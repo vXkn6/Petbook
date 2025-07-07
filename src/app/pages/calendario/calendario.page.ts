@@ -1,17 +1,20 @@
-import { Component, OnInit } from '@angular/core';
-import { AlertController, ToastController, ModalController } from '@ionic/angular';
+import { Component, OnInit, OnDestroy } from '@angular/core';
+import { AlertController, ToastController } from '@ionic/angular';
 import { Firestore, collection, addDoc, updateDoc, deleteDoc, doc, collectionData, query, orderBy, where } from '@angular/fire/firestore';
 import { LocalNotifications } from '@capacitor/local-notifications';
-import { AutheticationService } from 'src/app/services/authetication.service';
+import { Subscription } from 'rxjs'; // Necesario para desuscribirse
+import { AutheticationService } from '../../services/authetication.service'; 
 
 export interface Recordatorio {
   id?: string;
-  fecha: string;       // Formato YYYY-MM-DD (UTC)
-  hora: string;        // Formato HH:MM (24h)
+  fecha: string;        // Formato YYYY-MM-DD (UTC)
+  hora: string;         // Formato HH:MM (24h)
   descripcion: string;
-  timestamp: number;   // Timestamp en UTC
+  timestamp: number;    // Timestamp en UTC
   notificationId?: number;
-  userId: string;
+  citaId?: string;      // Campo para vincular con la cita
+  estadoCita?: 'pendiente' | 'confirmada' | 'cancelada' | 'completada';
+  userId: string;       // ¡NUEVO CAMPO! Para almacenar el ID del usuario
 }
 
 @Component({
@@ -20,41 +23,52 @@ export interface Recordatorio {
   styleUrls: ['./calendario.page.scss'],
   standalone: false
 })
-export class CalendarioPage implements OnInit {
+export class CalendarioPage implements OnInit, OnDestroy { // Implementamos OnDestroy
   fechaSeleccionada: string = '';
   recordatorios: Recordatorio[] = [];
   recordatoriosFiltrados: Recordatorio[] = [];
   loading = true;
-  userId: string | null = null;
+
+  private currentUserUid: string | null = null;
+  private userSubscription: Subscription | undefined; // Para manejar la suscripción del usuario
 
   constructor(
     private alertController: AlertController,
     private toastController: ToastController,
-    private modalController: ModalController,
     private firestore: Firestore,
-    private authService: AutheticationService
+    private authService: AutheticationService // Inyectamos tu servicio de autenticación
   ) {
-    // Establecer fecha actual en formato local (YYYY-MM-DD)
     const hoy = new Date();
     this.fechaSeleccionada = this.formatLocalDate(hoy);
   }
 
-  async ngOnInit() {
-    await this.requestNotificationPermissions();
-    this.cargarRecordatorios();
+  async ngOnInit(): Promise<void> {
+    await LocalNotifications.requestPermissions();
 
-    const user = this.authService.getCurrentUser();
-    if (user) {
-      this.userId = user.uid;
-      this.cargarRecordatorios();
-    } else {
-      this.userId = null;
-      this.recordatorios = [];
-      this.recordatoriosFiltrados = [];
+    // Nos suscribimos a los cambios de autenticación para obtener el UID del usuario
+    this.userSubscription = this.authService.currentUser$.subscribe(user => {
+      if (user) {
+        this.currentUserUid = user.uid;
+        this.cargarRecordatorios(); // Cargar recordatorios una vez que el usuario está disponible
+      } else {
+        this.currentUserUid = null;
+        this.recordatorios = [];
+        this.recordatoriosFiltrados = [];
+        this.loading = false;
+        // Opcional: Podrías redirigir al usuario a la página de login si no está autenticado
+        // this.router.navigateByUrl('/login');
+        this.mostrarToast('Debes iniciar sesión para ver tus recordatorios.', 'warning');
+      }
+    });
+  }
+
+  // Importante: Desuscribirse para evitar fugas de memoria
+  ngOnDestroy(): void {
+    if (this.userSubscription) {
+      this.userSubscription.unsubscribe();
     }
   }
 
-  // 🔄 Formatear fecha local (YYYY-MM-DD)
   private formatLocalDate(date: Date): string {
     const year = date.getFullYear();
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -62,7 +76,6 @@ export class CalendarioPage implements OnInit {
     return `${year}-${month}-${day}`;
   }
 
-  // ⏳ Convertir fecha local a UTC para Firebase
   private convertToUTC(dateString: string, timeString: string): { dateUTC: string, timestampUTC: number } {
     const localDate = new Date(`${dateString}T${timeString}`);
     const utcDate = new Date(
@@ -74,15 +87,13 @@ export class CalendarioPage implements OnInit {
         localDate.getMinutes()
       )
     );
-
     return {
-      dateUTC: utcDate.toISOString().split('T')[0], // Fecha UTC (YYYY-MM-DD)
-      timestampUTC: utcDate.getTime()               // Timestamp UTC
+      dateUTC: utcDate.toISOString().split('T')[0],
+      timestampUTC: utcDate.getTime()
     };
   }
 
-  // 🔔 Solicitar permisos para notificaciones
-  async requestNotificationPermissions() {
+  async requestNotificationPermissions(): Promise<void> {
     try {
       await LocalNotifications.requestPermissions();
     } catch (error) {
@@ -90,22 +101,21 @@ export class CalendarioPage implements OnInit {
     }
   }
 
-  // 📥 Cargar recordatorios desde Firebase
-
-  cargarRecordatorios() {
-    if (!this.userId) {
+  cargarRecordatorios(): void {
+    // Si no hay un usuario logueado, limpiamos y salimos
+    if (!this.currentUserUid) {
       this.recordatorios = [];
       this.recordatoriosFiltrados = [];
+      this.loading = false;
       return;
     }
 
     this.loading = true;
     const recordatoriosRef = collection(this.firestore, 'recordatorios');
-
-    // Filtrar por userId
+    // Filtramos los recordatorios para que solo se muestren los del usuario actual
     const q = query(
       recordatoriosRef,
-      where('userId', '==', this.userId),
+      where('userId', '==', this.currentUserUid), // ¡FILTRO CLAVE!
       orderBy('timestamp', 'asc')
     );
 
@@ -113,7 +123,9 @@ export class CalendarioPage implements OnInit {
       next: (recordatorios: any[]) => {
         this.recordatorios = recordatorios.map(r => ({
           ...r,
-          fecha: r.fecha.split('T')[0] // Normalizar formato
+          fecha: r.fecha.split('T')[0],
+          estadoCita: r.estadoCita,
+          userId: r.userId // Aseguramos que userId también se mapea
         })) as Recordatorio[];
 
         this.filtrarRecordatoriosPorFecha();
@@ -127,8 +139,7 @@ export class CalendarioPage implements OnInit {
     });
   }
 
-  // 📅 Cuando se selecciona una fecha
-  onFechaSeleccionada(event: any) {
+  onFechaSeleccionada(event: any): void {
     if (event?.detail?.value) {
       this.fechaSeleccionada = event.detail.value.split('T')[0];
       console.log('Fecha seleccionada (local):', this.fechaSeleccionada);
@@ -136,14 +147,12 @@ export class CalendarioPage implements OnInit {
     }
   }
 
-  // 🔍 Filtrar recordatorios por fecha seleccionada
-  filtrarRecordatoriosPorFecha() {
+  filtrarRecordatoriosPorFecha(): void {
     if (!this.recordatorios || !this.fechaSeleccionada) {
       this.recordatoriosFiltrados = [];
       return;
     }
 
-    // Convertir fecha seleccionada a UTC para comparación
     const { dateUTC } = this.convertToUTC(this.fechaSeleccionada, '00:00');
 
     this.recordatoriosFiltrados = this.recordatorios.filter(
@@ -151,8 +160,13 @@ export class CalendarioPage implements OnInit {
     );
   }
 
-  // ➕ Crear nuevo recordatorio
-  async crearRecordatorio() {
+  async crearRecordatorio(): Promise<void> {
+    // Verificar si hay un usuario logueado antes de permitir la creación
+    if (!this.currentUserUid) {
+      this.mostrarToast('Debes iniciar sesión para crear recordatorios.', 'warning');
+      return;
+    }
+
     const alert = await this.alertController.create({
       header: 'Nuevo Recordatorio',
       inputs: [
@@ -186,20 +200,19 @@ export class CalendarioPage implements OnInit {
         }
       ]
     });
-
     await alert.present();
   }
 
-  // 💾 Guardar recordatorio en Firebase
-  async guardarRecordatorio(hora: string, descripcion: string) {
-    if (!this.userId) {
-      this.mostrarToast('Debes iniciar sesión para crear recordatorios', 'warning');
+  async guardarRecordatorio(hora: string, descripcion: string): Promise<void> {
+    // Doble verificación del usuario logueado
+    if (!this.currentUserUid) {
+      this.mostrarToast('Error: No hay usuario logueado para guardar el recordatorio.', 'danger');
       return;
     }
 
     try {
       const { dateUTC, timestampUTC } = this.convertToUTC(this.fechaSeleccionada, hora);
-      const notificationId = Date.now();
+      const notificationId = Date.now(); // Genera un ID de notificación único
 
       const recordatorio: Recordatorio = {
         fecha: dateUTC,
@@ -207,39 +220,38 @@ export class CalendarioPage implements OnInit {
         descripcion: descripcion,
         timestamp: timestampUTC,
         notificationId: notificationId,
-        userId: this.userId  // Añadir el ID del usuario
+        userId: this.currentUserUid, // ¡ASIGNA EL ID DEL USUARIO ACTUAL!
+        // No se asigna citaId ni estadoCita aquí, ya que es un recordatorio manual
       };
 
-      // Guardar en Firebase
       const recordatoriosRef = collection(this.firestore, 'recordatorios');
       await addDoc(recordatoriosRef, recordatorio);
 
-      // Programar notificación (usando hora local)
+      // Programar notificación
       await this.programarNotificacion({
         ...recordatorio,
-        fecha: this.fechaSeleccionada
+        fecha: this.fechaSeleccionada // Usa la fecha local para programar la notificación
       });
 
       this.mostrarToast('Recordatorio guardado', 'success');
-      this.cargarRecordatorios(); // Actualizar lista
+      // La carga de recordatorios se manejará automáticamente por la suscripción a Firestore
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error al guardar recordatorio:', error);
       this.mostrarToast('Error al guardar', 'danger');
     }
   }
 
-  // 🔔 Programar notificación local
-  async programarNotificacion(recordatorio: Recordatorio) {
+  async programarNotificacion(recordatorio: Recordatorio): Promise<void> {
     try {
       const fechaNotificacion = new Date(`${recordatorio.fecha}T${recordatorio.hora}`);
 
-      if (fechaNotificacion > new Date()) {
+      if (fechaNotificacion > new Date() && recordatorio.notificationId !== undefined) {
         await LocalNotifications.schedule({
           notifications: [
             {
               title: 'Recordatorio',
               body: recordatorio.descripcion,
-              id: recordatorio.notificationId!,
+              id: recordatorio.notificationId,
               schedule: { at: fechaNotificacion },
               sound: 'default'
             }
@@ -251,8 +263,18 @@ export class CalendarioPage implements OnInit {
     }
   }
 
-  // ✏️ Editar recordatorio existente
-  async editarRecordatorio(recordatorio: Recordatorio) {
+  async editarRecordatorio(recordatorio: Recordatorio): Promise<void> {
+    // Deshabilita la edición si es un recordatorio de cita (para manejarlo en la sección de citas)
+    if (recordatorio.citaId) {
+      this.mostrarToast('Este recordatorio está asociado a una cita y debe ser editado desde la sección de Citas.', 'warning');
+      return;
+    }
+    // Aseguramos que solo el propietario pueda editar
+    if (recordatorio.userId !== this.currentUserUid) {
+        this.mostrarToast('No tienes permiso para editar este recordatorio.', 'danger');
+        return;
+    }
+
     const alert = await this.alertController.create({
       header: 'Editar Recordatorio',
       inputs: [
@@ -290,17 +312,10 @@ export class CalendarioPage implements OnInit {
         }
       ]
     });
-
     await alert.present();
   }
 
-  // 🔄 Actualizar recordatorio en Firebase
-  async actualizarRecordatorio(id: string, hora: string, descripcion: string, notificationId: number) {
-    if (!this.userId) {
-      this.mostrarToast('Debes iniciar sesión para editar recordatorios', 'warning');
-      return;
-    }
-
+  async actualizarRecordatorio(id: string, hora: string, descripcion: string, notificationId: number): Promise<void> {
     try {
       const { dateUTC, timestampUTC } = this.convertToUTC(this.fechaSeleccionada, hora);
 
@@ -308,34 +323,43 @@ export class CalendarioPage implements OnInit {
         fecha: dateUTC,
         hora: hora,
         descripcion: descripcion,
-        timestamp: timestampUTC,
-        userId: this.userId  // Mantener el ID del usuario
+        timestamp: timestampUTC
       };
 
-      // Actualizar en Firebase
       const recordatorioRef = doc(this.firestore, 'recordatorios', id);
       await updateDoc(recordatorioRef, recordatorioActualizado);
 
-      // Cancelar notificación anterior
-      await LocalNotifications.cancel({ notifications: [{ id: notificationId }] });
-
-      // Programar nueva notificación
+      // Cancelar y reprogramar la notificación
+      if (notificationId !== undefined) {
+        await LocalNotifications.cancel({ notifications: [{ id: notificationId }] });
+      }
       await this.programarNotificacion({
         ...recordatorioActualizado,
         fecha: this.fechaSeleccionada,
-        notificationId: notificationId
+        notificationId: notificationId,
+        userId: this.currentUserUid! // Aseguramos que el userId esté presente para programar
       } as Recordatorio);
 
       this.mostrarToast('Recordatorio actualizado', 'success');
-      this.cargarRecordatorios();
+      // La carga de recordatorios se manejará automáticamente
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error al actualizar recordatorio:', error);
       this.mostrarToast('Error al actualizar', 'danger');
     }
   }
 
-  // 🗑️ Eliminar recordatorio
-  async eliminarRecordatorio(recordatorio: Recordatorio) {
+  async eliminarRecordatorio(recordatorio: Recordatorio): Promise<void> {
+    // Deshabilita la eliminación si es un recordatorio de cita (para manejarlo en la sección de citas)
+    if (recordatorio.citaId) {
+      this.mostrarToast('Este recordatorio está asociado a una cita y no puede ser eliminado desde aquí. Cancele la cita para eliminar el recordatorio.', 'warning');
+      return;
+    }
+    // Aseguramos que solo el propietario pueda eliminar
+    if (recordatorio.userId !== this.currentUserUid) {
+        this.mostrarToast('No tienes permiso para eliminar este recordatorio.', 'danger');
+        return;
+    }
+
     const alert = await this.alertController.create({
       header: 'Confirmar',
       message: '¿Eliminar este recordatorio?',
@@ -348,33 +372,29 @@ export class CalendarioPage implements OnInit {
           text: 'Eliminar',
           handler: async () => {
             try {
-              // Eliminar de Firebase
               const recordatorioRef = doc(this.firestore, 'recordatorios', recordatorio.id!);
               await deleteDoc(recordatorioRef);
 
-              // Cancelar notificación
-              if (recordatorio.notificationId) {
+              if (recordatorio.notificationId !== undefined) {
                 await LocalNotifications.cancel({
                   notifications: [{ id: recordatorio.notificationId }]
                 });
               }
 
               this.mostrarToast('Recordatorio eliminado', 'success');
-              this.cargarRecordatorios();
+              // La carga de recordatorios se manejará automáticamente
             } catch (error) {
-              console.error('Error:', error);
+              console.error('Error al eliminar recordatorio:', error);
               this.mostrarToast('Error al eliminar', 'danger');
             }
           }
         }
       ]
     });
-
     await alert.present();
   }
 
-  // 💬 Mostrar mensaje Toast
-  async mostrarToast(mensaje: string, color: string) {
+  async mostrarToast(mensaje: string, color: string): Promise<void> {
     const toast = await this.toastController.create({
       message: mensaje,
       duration: 2000,
@@ -384,7 +404,6 @@ export class CalendarioPage implements OnInit {
     toast.present();
   }
 
-  // 🕒 Formatear hora (HH:MM → 12h AM/PM)
   formatearHora(hora: string): string {
     return new Date(`2000-01-01T${hora}`).toLocaleTimeString('es-ES', {
       hour: '2-digit',
@@ -392,9 +411,7 @@ export class CalendarioPage implements OnInit {
     });
   }
 
-  // 📅 Formatear fecha (UTC → texto legible)
   formatearFecha(fechaUTC: string): string {
-    // Solución definitiva: usar componentes de fecha directamente
     const [year, month, day] = fechaUTC.split('-').map(Number);
     const fechaLocal = new Date(year, month - 1, day);
 
