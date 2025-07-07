@@ -1,18 +1,26 @@
 import { Injectable, inject } from '@angular/core';
-import {
-  Auth,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
+import { 
+  Auth, 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signOut, 
   authState,
   sendPasswordResetEmail,
   UserCredential
 } from '@angular/fire/auth';
-import { Firestore, collection, doc, setDoc } from '@angular/fire/firestore';
+import { 
+  Firestore, 
+  collection, 
+  doc, 
+  setDoc, 
+  query, 
+  where, 
+  getDocs,
+  getDoc 
+} from '@angular/fire/firestore';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { Router } from '@angular/router';
-import OneSignal from 'onesignal-cordova-plugin';
 
 @Injectable({
   providedIn: 'root'
@@ -21,7 +29,7 @@ export class AutheticationService {
   private auth: Auth = inject(Auth);
   private firestore: Firestore = inject(Firestore);
   private router: Router = inject(Router);
-
+  
   private authState = new BehaviorSubject<boolean>(false);
   currentUser$ = authState(this.auth);
   isAuthenticated$ = this.currentUser$.pipe(map(user => !!user));
@@ -37,7 +45,7 @@ export class AutheticationService {
   }
 
   // Método para registrar un nuevo usuario
-  async register(email: string, password: string): Promise<any> {
+  async register(email: string, password: string): Promise<UserCredential> {
     try {
       const userCredential = await createUserWithEmailAndPassword(this.auth, email, password);
       return userCredential;
@@ -46,17 +54,35 @@ export class AutheticationService {
     }
   }
 
-  async saveUserData(uid: string, email: string, displayName?: string): Promise<void> {
+  // Verificar si un nombre de usuario está disponible
+  async checkUsernameAvailability(username: string): Promise<boolean> {
     try {
-      const usersCollectionRef = collection(this.firestore, 'users'); // Referencia a la colección 'users'
-      const userDocRef = doc(usersCollectionRef, uid); // Referencia al documento específico con el UID como ID
+      const usersCollectionRef = collection(this.firestore, 'users');
+      const q = query(usersCollectionRef, where('username', '==', username.toLowerCase()));
+      const querySnapshot = await getDocs(q);
+      
+      return querySnapshot.empty; // true si está disponible, false si ya existe
+    } catch (error) {
+      console.error('Error checking username availability:', error);
+      throw error;
+    }
+  }
+  
+  // Método actualizado para guardar datos del usuario incluyendo username
+  async saveUserData(uid: string, email: string, username: string, displayName?: string): Promise<void> {
+    try {
+      const usersCollectionRef = collection(this.firestore, 'users');
+      const userDocRef = doc(usersCollectionRef, uid);
 
       await setDoc(userDocRef, {
+        uid: uid,
         email: email,
-        displayName: displayName || 'Usuario Nuevo', // Puedes pasar un nombre o usar uno por defecto
-        role: 'user', // Rol por defecto al registrar
-        creationTime: new Date(), // Fecha de creación del usuario
-        isActive: true // Estado por defecto
+        username: username.toLowerCase(), // Guardamos en minúsculas para consistencia
+        displayName: displayName || username, // Usamos el username como displayName por defecto
+        role: 'user',
+        creationTime: new Date(),
+        updatedTime: new Date(),
+        isActive: true
       });
       console.log('Datos de usuario guardados en Firestore:', uid);
     } catch (error) {
@@ -64,29 +90,47 @@ export class AutheticationService {
       throw error;
     }
   }
-  private isOneSignalAvailable(): boolean {
-    return typeof window !== 'undefined' &&
-      typeof (window as any).cordova !== 'undefined' &&
-      typeof OneSignal !== 'undefined' &&
-      typeof OneSignal.login === 'function';
+
+  // Método para obtener datos del usuario desde Firestore
+  async getUserData(uid: string): Promise<any> {
+    try {
+      const userDocRef = doc(this.firestore, 'users', uid);
+      const userDoc = await getDoc(userDocRef);
+      
+      if (userDoc.exists()) {
+        return userDoc.data();
+      } else {
+        throw new Error('Usuario no encontrado en Firestore');
+      }
+    } catch (error) {
+      console.error('Error getting user data:', error);
+      throw error;
+    }
+  }
+
+  // Método para obtener usuario por username
+  async getUserByUsername(username: string): Promise<any> {
+    try {
+      const usersCollectionRef = collection(this.firestore, 'users');
+      const q = query(usersCollectionRef, where('username', '==', username.toLowerCase()));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        return querySnapshot.docs[0].data();
+      } else {
+        throw new Error('Usuario no encontrado');
+      }
+    } catch (error) {
+      console.error('Error getting user by username:', error);
+      throw error;
+    }
   }
 
   // Método para iniciar sesión
-  async login(email: string, password: string): Promise<any> {
+  async login(email: string, password: string): Promise<UserCredential> {
     try {
       const userCredential = await signInWithEmailAndPassword(this.auth, email, password);
-
-      // Obtener el UID del usuario autenticado
-      const userId = userCredential.user.uid;
-
-      if (this.isOneSignalAvailable()) {
-        OneSignal.login(userId);
-      }
-      OneSignal.User.getExternalId().then(id => console.log('🧾 Usuario actual OneSignal:', id));
-
-      // Redireccionar
       this.router.navigate(['/home']);
-
       return userCredential;
     } catch (error) {
       throw error;
@@ -97,10 +141,6 @@ export class AutheticationService {
   async logout(): Promise<void> {
     try {
       await signOut(this.auth);
-
-      if (this.isOneSignalAvailable() && typeof OneSignal.logout === 'function') {
-        OneSignal.logout();
-      }
       this.router.navigate(['/login']);
     } catch (error) {
       throw error;
@@ -117,6 +157,26 @@ export class AutheticationService {
     try {
       await sendPasswordResetEmail(this.auth, email);
     } catch (error) {
+      throw error;
+    }
+  }
+
+  // Método para verificar si el usuario actual está autenticado
+  isUserAuthenticated(): boolean {
+    return this.auth.currentUser !== null;
+  }
+
+  // Método para actualizar datos del usuario
+  async updateUserData(uid: string, data: any): Promise<void> {
+    try {
+      const userDocRef = doc(this.firestore, 'users', uid);
+      await setDoc(userDocRef, {
+        ...data,
+        updatedTime: new Date()
+      }, { merge: true });
+      console.log('Datos del usuario actualizados');
+    } catch (error) {
+      console.error('Error al actualizar datos del usuario:', error);
       throw error;
     }
   }
