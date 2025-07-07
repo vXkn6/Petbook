@@ -1,12 +1,14 @@
+// home.page.ts
+
 import { Component, OnInit, inject, ViewChild, ElementRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { IonicModule, ActionSheetController, AlertController, IonTextarea } from '@ionic/angular';
+import { IonicModule, ActionSheetController, AlertController, IonTextarea, MenuController, ModalController } from '@ionic/angular';
 import { CommonModule } from '@angular/common';
 import { addIcons } from 'ionicons';
 import {
   logOutOutline, personCircleOutline, cameraOutline,
-  imagesOutline, heartOutline, heart, chatbubbleOutline,
-  ellipsisVerticalOutline, trashOutline, closeOutline, personOutline, pawOutline, calendarOutline, medicalOutline, chatbubblesOutline, send, sync, add
+  imagesOutline, heartOutline, heart, chatbubbleOutline, chatbubbleEllipsesOutline,
+  ellipsisVerticalOutline, trashOutline, closeOutline, personOutline, pawOutline, calendarOutline, medicalOutline, chatbubblesOutline, send, sync, add, clipboardOutline, barChartOutline // Asegúrate de que todos los iconos usados en HTML estén aquí
 } from 'ionicons/icons';
 import { Router } from '@angular/router';
 import { RouterModule } from '@angular/router';
@@ -19,6 +21,7 @@ import { Observable } from 'rxjs';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
 import Compressor from 'compressorjs';
+import { CommentsModalComponent } from '../components/comments-modal/comments-modal.component';
 
 @Component({
   selector: 'app-home',
@@ -26,11 +29,12 @@ import Compressor from 'compressorjs';
   styleUrls: ['home.page.scss'],
   standalone: false,
 })
-export class HomePage {
+export class HomePage implements OnInit {
   // Propiedades del usuario
   userEmail: string | null = null;
   userRole: string | null = null;
   userName: string | null = null;
+  userPhotoURL: string | null = null;
   currentUser: any = null;
 
   // Propiedades de la red social
@@ -50,13 +54,16 @@ export class HomePage {
   private router = inject(Router);
   private actionSheetController = inject(ActionSheetController);
   private alertController = inject(AlertController);
+  private menuCtrl = inject(MenuController);
+  private modalController = inject(ModalController);
   private localImagePaths: { [postId: string]: string } = {};
 
   constructor() {
     addIcons({
       personCircleOutline, personOutline, pawOutline, calendarOutline, medicalOutline, chatbubblesOutline,
       logOutOutline, closeOutline, cameraOutline, send, sync, ellipsisVerticalOutline,
-      chatbubbleOutline, add, imagesOutline, heartOutline, heart, trashOutline
+      chatbubbleOutline, chatbubbleEllipsesOutline, add, imagesOutline, heartOutline, heart, trashOutline,
+      clipboardOutline, barChartOutline // Asegúrate de agregar los iconos nuevos si los usas en tu HTML
     });
 
     // Inicializar posts observable si el servicio existe
@@ -89,17 +96,22 @@ export class HomePage {
 
       if (userData) {
         this.userRole = userData['role'] || null;
-        this.userName = userData['name'] || null;
+        this.userName = userData['displayName'] || userData['name'] || null;
+        this.userPhotoURL = userData['photoURL'] || null;
       }
     } catch (error) {
       console.error('Error al obtener datos del usuario:', error);
     }
   }
 
-  // ¡¡AQUÍ DEBE ESTAR LA FUNCIÓN focusTextarea!!
+  // Función para obtener la URL de la foto del usuario
+  getUserPhoto(): string {
+    return this.userPhotoURL || 'https://ionicframework.com/docs/img/demos/avatar.svg';
+  }
+
   async focusTextarea() {
     if (this.postTextarea) {
-      await this.postTextarea.setFocus(); // Usa setFocus() directamente en el componente Ionic
+      await this.postTextarea.setFocus();
     }
   }
 
@@ -118,6 +130,7 @@ export class HomePage {
           handler: async () => {
             try {
               await this.authService.logout();
+              await this.menuCtrl.close('main-menu');
             } catch (error) {
               console.error('Error al cerrar sesión:', error);
             }
@@ -157,75 +170,73 @@ export class HomePage {
     await actionSheet.present();
   }
 
-async takePicture(source: CameraSource) {
-  try {
-    const image = await Camera.getPhoto({
-      quality: 70,  // ↓ Calidad reducida (70%)
-      allowEditing: false,
-      resultType: CameraResultType.Base64,
-      source: source,
-      width: 800,   // ↓ Ancho máximo
-      height: 800   // ↓ Alto máximo
+  async takePicture(source: CameraSource) {
+    try {
+      const image = await Camera.getPhoto({
+        quality: 70,
+        allowEditing: false,
+        resultType: CameraResultType.Base64,
+        source: source,
+        width: 800,
+        height: 800
+      });
+
+      if (image.base64String) {
+        const compressedBase64 = await this.compressImage(image.base64String);
+        this.selectedImageBase64 = compressedBase64;
+        this.selectedImagePreview = `data:image/jpeg;base64,${compressedBase64}`;
+      }
+    } catch (error) {
+      console.error('Error al tomar foto:', error);
+      this.showToast('Error al capturar imagen', 'danger');
+    }
+  }
+
+  private async compressImage(base64: string): Promise<string> {
+    const blob = this.base64ToBlob(base64);
+
+    const compressedBlob = await new Promise<Blob>((resolve, reject) => {
+      new Compressor(blob, {
+        quality: 0.7,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        success: resolve,
+        error: reject
+      });
     });
 
-    if (image.base64String) {
-      const compressedBase64 = await this.compressImage(image.base64String);
-      this.selectedImageBase64 = compressedBase64;
-      this.selectedImagePreview = `data:image/jpeg;base64,${compressedBase64}`;
-    }
-  } catch (error) {
-    console.error('Error al tomar foto:', error);
-    this.showToast('Error al capturar imagen', 'danger');
+    return this.blobToBase64(compressedBlob);
   }
-}
-private async compressImage(base64: string): Promise<string> {
-  // 1. Convertir base64 a Blob
-  const blob = this.base64ToBlob(base64);
-  
-  // 2. Comprimir el Blob
-  const compressedBlob = await new Promise<Blob>((resolve, reject) => {
-    new Compressor(blob, {
-      quality: 0.7,
-      maxWidth: 1024,
-      maxHeight: 1024,
-      success: resolve,
-      error: reject
+
+  private blobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        resolve(result.split(',')[1]);
+      };
+      reader.readAsDataURL(blob);
     });
-  });
-  
-  // 3. Convertir el Blob comprimido de vuelta a base64
-  return this.blobToBase64(compressedBlob);
-}
-
-private blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = reader.result as string;
-      resolve(result.split(',')[1]); // Extrae solo el base64
-    };
-    reader.readAsDataURL(blob);
-  });
-}
-
-private base64ToBlob(base64: string, contentType = 'image/jpeg'): Blob {
-  const byteCharacters = atob(base64);
-  const byteArrays = [];
-  
-  for (let offset = 0; offset < byteCharacters.length; offset += 512) {
-    const slice = byteCharacters.slice(offset, offset + 512);
-    const byteNumbers = new Array(slice.length);
-    
-    for (let i = 0; i < slice.length; i++) {
-      byteNumbers[i] = slice.charCodeAt(i);
-    }
-    
-    const byteArray = new Uint8Array(byteNumbers);
-    byteArrays.push(byteArray);
   }
-  
-  return new Blob(byteArrays, { type: contentType });
-}
+
+  private base64ToBlob(base64: string, contentType = 'image/jpeg'): Blob {
+    const byteCharacters = atob(base64);
+    const byteArrays = [];
+
+    for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+      const slice = byteCharacters.slice(offset, offset + 512);
+      const byteNumbers = new Array(slice.length);
+
+      for (let i = 0; i < slice.length; i++) {
+        byteNumbers[i] = slice.charCodeAt(i);
+      }
+
+      const byteArray = new Uint8Array(byteNumbers);
+      byteArrays.push(byteArray);
+    }
+
+    return new Blob(byteArrays, { type: contentType });
+  }
 
   async createPost() {
     if (!this.newPostContent.trim() && !this.selectedImageBase64) {
@@ -262,9 +273,10 @@ private base64ToBlob(base64: string, contentType = 'image/jpeg'): Blob {
   }
 
   removeSelectedImage() {
-    this.selectedImageBase64 = undefined; // En lugar de null
+    this.selectedImageBase64 = undefined;
     this.selectedImagePreview = undefined;
   }
+
   async toggleLike(postId: string) {
     if (!this.socialService) return;
 
@@ -291,59 +303,24 @@ private base64ToBlob(base64: string, contentType = 'image/jpeg'): Blob {
 
     try {
       const comments = await this.socialService.getComments(post.id!);
-
-      const alert = await this.alertController.create({
-        header: `Comentarios (${comments.length})`,
-        cssClass: 'comments-alert',
-        inputs: [
-          {
-            name: 'newComment',
-            type: 'textarea',
-            placeholder: 'Escribe un comentario...',
-            attributes: {
-              maxlength: 500
-            }
-          }
-        ],
-        buttons: [
-          {
-            text: 'Cancelar',
-            role: 'cancel'
-          },
-          {
-            text: 'Comentar',
-            handler: async (data: any) => {
-              if (data.newComment?.trim()) {
-                try {
-                  await this.socialService.addComment(post.id!, data.newComment);
-                  this.showToast('Comentario agregado', 'success');
-                } catch (error) {
-                  this.showToast('Error al comentar', 'danger');
-                }
-              }
-            }
-          }
-        ]
+      
+      const modal = await this.modalController.create({
+        component: CommentsModalComponent,
+        componentProps: {
+          post: post,
+          comments: comments
+        },
+        cssClass: 'comments-modal'
       });
 
-      // Agregar comentarios existentes al alert
-      let message = '';
-      if (comments.length > 0) {
-        message = comments.map((comment: Comment) =>
-          `<div class="comment">
-            <div class="comment-header">
-              <strong>${comment.userName}</strong>
-              <span class="comment-time">${this.formatTime(comment.timestamp)}</span>
-            </div>
-            <div class="comment-content">${comment.content}</div>
-          </div>`
-        ).join('');
-      } else {
-        message = '<div class="no-comments">No hay comentarios aún. ¡Sé el primero en comentar!</div>';
-      }
-      alert.message = message;
+      modal.onDidDismiss().then((result) => {
+        if (result.data?.newComment) {
+          // Actualizar la lista de comentarios si se agregó uno nuevo
+          this.showToast('Comentario agregado', 'success');
+        }
+      });
 
-      await alert.present();
+      await modal.present();
     } catch (error) {
       console.error('Error al cargar comentarios:', error);
       this.showToast('Error al cargar comentarios', 'danger');

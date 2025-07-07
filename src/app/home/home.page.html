@@ -7,10 +7,9 @@
 
   <ion-content>
     <ion-list>
-      <!-- Información del usuario -->
       <ion-item>
         <ion-avatar slot="start">
-          <ion-icon name="person-circle-outline" size="large"></ion-icon>
+          <img [src]="getUserPhoto()" alt="Foto de perfil">
         </ion-avatar>
         <ion-label>
           <h2>{{ getUserDisplayName() }}</h2>
@@ -21,7 +20,6 @@
         </ion-label>
       </ion-item>
 
-      <!-- Navegación de la app de mascotas -->
       <ion-item button routerLink="/profile" routerDirection="forward">
         <ion-icon name="person-outline" slot="start"></ion-icon>
         <ion-label>Perfil</ion-label>
@@ -57,7 +55,6 @@
         <ion-label>Dashboards</ion-label>
       </ion-item>
 
-      <!-- Cerrar sesión -->
       <ion-item button (click)="logout()">
         <ion-icon name="log-out-outline" slot="start"></ion-icon>
         <ion-label>Cerrar Sesión</ion-label>
@@ -66,7 +63,6 @@
   </ion-content>
 </ion-menu>
 
-<!-- Contenido principal -->
 <div class="ion-page" id="main-content">
   <ion-header [translucent]="true">
     <ion-toolbar color="primary">
@@ -80,14 +76,12 @@
   </ion-header>
 
   <ion-content [fullscreen]="true" class="ion-padding">
-    <!-- Header con saludo -->
     <ion-header collapse="condense">
       <ion-toolbar>
         <ion-title size="large">Comunidad de Mascotas</ion-title>
       </ion-toolbar>
     </ion-header>
 
-    <!-- Navegación rápida a secciones principales -->
     <ion-card>
       <ion-card-header>
         <ion-card-title>Acceso Rápido</ion-card-title>
@@ -124,7 +118,6 @@
       </ion-card-content>
     </ion-card>
 
-    <!-- Formulario para crear nueva publicación -->
     <ion-card>
       <ion-card-header>
         <ion-card-title>¿Qué hace tu mascota hoy?</ion-card-title>
@@ -132,10 +125,9 @@
       </ion-card-header>
       <ion-card-content>
         <ion-textarea [(ngModel)]="newPostContent" placeholder="Cuéntanos sobre tu mascota..." rows="3" maxlength="500"
-          counter="true">
+          counter="true" #postTextarea>
         </ion-textarea>
 
-        <!-- Preview de imagen seleccionada -->
         <div *ngIf="selectedImagePreview" class="image-preview">
           <ion-img *ngIf="selectedImagePreview" [src]="selectedImagePreview" alt="Preview"></ion-img>
           <ion-button fill="clear" color="danger" (click)="removeSelectedImage()" class="remove-image-btn">
@@ -143,7 +135,6 @@
           </ion-button>
         </div>
 
-        <!-- Botones de acción -->
         <div class="post-actions">
           <ion-button fill="outline" (click)="selectImage()" [disabled]="isLoading">
             <ion-icon name="camera-outline" slot="start"></ion-icon>
@@ -160,15 +151,13 @@
       </ion-card-content>
     </ion-card>
 
-    <!-- Lista de publicaciones -->
     <div *ngIf="posts$ | async as posts; else noPosts">
       <ion-card *ngFor="let post of posts; trackBy: trackByPostId" class="post-card">
-        <!-- Header del post -->
         <ion-card-header>
           <div class="post-header">
             <div class="user-info">
               <ion-avatar>
-                <ion-icon name="person-circle-outline"></ion-icon>
+                <img [src]="post.userAvatar || 'https://ionicframework.com/docs/img/demos/avatar.svg'" alt="Foto de perfil del autor">
               </ion-avatar>
               <div class="user-details">
                 <ion-card-title>{{ post.userName }}</ion-card-title>
@@ -176,20 +165,17 @@
               </div>
             </div>
 
-            <!-- Opciones del post (solo para posts propios) -->
             <ion-button *ngIf="isUserPost(post)" fill="clear" (click)="showPostOptions(post)">
               <ion-icon name="ellipsis-vertical-outline"></ion-icon>
             </ion-button>
           </div>
         </ion-card-header>
 
-        <!-- Contenido del post -->
         <ion-card-content>
           <p *ngIf="post.content" class="post-content">{{ post.content }}</p>
           <ion-img *ngIf="post.imageBase64" [src]="post.imageBase64" alt="Imagen del post" class="post-image"></ion-img>
         </ion-card-content>
 
-        <!-- Acciones del post -->
         <div class="post-actions-bar">
           <ion-button fill="clear" (click)="toggleLike(post.id!)" [color]="hasUserLiked(post) ? 'danger' : 'medium'">
             <ion-icon [name]="hasUserLiked(post) ? 'heart' : 'heart-outline'" slot="start">
@@ -205,7 +191,6 @@
       </ion-card>
     </div>
 
-    <!-- Mensaje cuando no hay publicaciones -->
     <ng-template #noPosts>
       <ion-card class="empty-state">
         <ion-card-content class="ion-text-center">
