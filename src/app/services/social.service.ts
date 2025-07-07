@@ -1,28 +1,31 @@
+// social.service.ts
+
 import { Injectable } from '@angular/core';
-import { 
-  Firestore, 
-  collection, 
-  addDoc, 
-  getDocs, 
-  doc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  orderBy, 
-  limit, 
+import {
+  Firestore,
+  collection,
+  addDoc,
+  getDocs,
+  doc,
+  updateDoc,
+  deleteDoc,
+  query,
+  orderBy,
+  limit,
   where,
   arrayUnion,
   arrayRemove,
   increment,
   serverTimestamp,
-  onSnapshot
+  onSnapshot,
+  getDoc // <-- Importa getDoc para obtener datos del usuario de Firestore
 } from '@angular/fire/firestore';
-import { 
-  Storage, 
-  ref, 
-  uploadString, 
+import {
+  Storage,
+  ref,
+  uploadString,
   getDownloadURL,
-  deleteObject 
+  deleteObject
 } from '@angular/fire/storage';
 import { Auth } from '@angular/fire/auth';
 import { BehaviorSubject, Observable } from 'rxjs';
@@ -47,7 +50,7 @@ export class SocialService {
   loadPosts() {
     const postsRef = collection(this.firestore, 'posts');
     const q = query(postsRef, orderBy('timestamp', 'desc'), limit(50));
-    
+
     onSnapshot(q, (snapshot) => {
       const posts: Post[] = [];
       snapshot.forEach((doc) => {
@@ -58,17 +61,42 @@ export class SocialService {
   }
 
   // Crear nuevo post (ahora acepta imageDataUrl como string)
-  async createPost(content: string, imageBase64?: string): Promise<void> {
+  async createPost(content: string, imageBase64?: string, community: 'cats' | 'dogs' | 'all' = 'all'): Promise<void> {
     if (!this.auth.currentUser) return;
 
     const user = this.auth.currentUser;
-    
-    const postData: Omit<Post, 'id'> = {
+
+    // --- NUEVA LÓGICA AQUÍ PARA OBTENER EL userAvatar ---
+    let userAvatar: string | null = null;
+    let userName: string = user.displayName || user.email?.split('@')[0] || 'Usuario';
+
+    try {
+      const userDocRef = doc(this.firestore, `users/${user.uid}`);
+      const userDocSnap = await getDoc(userDocRef);
+      if (userDocSnap.exists()) {
+        const userData = userDocSnap.data();
+        if (userData?.['photoURL']) { // Asegúrate de que 'photoURL' sea el campo donde guardas la imagen en Firestore
+          userAvatar = userData['photoURL'];
+        }
+        if (userData?.['displayName']) { // Si tienes un displayName en Firestore
+          userName = userData['displayName'];
+        } else if (userData?.['name']) { // Si usas 'name' en lugar de 'displayName'
+          userName = userData['name'];
+        }
+      }
+    } catch (error) {
+      console.error('Error al obtener el avatar del usuario para el post:', error);
+      // Opcional: Podrías asignar un avatar por defecto o dejarlo nulo si hay un error
+    }
+    // --- FIN DE LA NUEVA LÓGICA ---
+
+    const postData: Post = {
       userId: user.uid,
       userEmail: user.email || '',
-      userName: user.displayName || user.email?.split('@')[0] || 'Usuario',
+      userName: userName, // Usa el userName obtenido de Firestore o el predeterminado
+      userAvatar: userAvatar || undefined, // <-- Asigna el userAvatar aquí
       content,
-      imageBase64: imageBase64 ? `data:image/jpeg;base64,${imageBase64}` : undefined,
+      imageBase64: imageBase64 ? `data:image/jpeg;base64,${imageBase64}` : null,
       timestamp: serverTimestamp(),
       likes: [],
       likesCount: 0,
@@ -84,7 +112,7 @@ export class SocialService {
 
     const postRef = doc(this.firestore, 'posts', postId);
     const userId = this.auth.currentUser.uid;
-    
+
     const post = this.postsSubject.value.find(p => p.id === postId);
     if (!post) return;
 
@@ -105,18 +133,41 @@ export class SocialService {
     }
   }
 
-  // Agregar comentario (sin cambios)
+  // Agregar comentario (sin cambios, ya tiene userAvatar)
   async addComment(postId: string, commentContent: string): Promise<void> {
     if (!this.auth.currentUser) return;
 
     const user = this.auth.currentUser;
-    
+
+    // --- NUEVA LÓGICA AQUÍ PARA OBTENER EL userAvatar para el comentario ---
+    let userAvatar: string | null = null;
+    let userName: string = user.displayName || user.email?.split('@')[0] || 'Usuario';
+
+    try {
+      const userDocRef = doc(this.firestore, `users/${user.uid}`);
+      const userDocSnap = await getDoc(userDocRef);
+      if (userDocSnap.exists()) {
+        const userData = userDocSnap.data();
+        if (userData?.['photoURL']) { // Asegúrate de que 'photoURL' sea el campo donde guardas la imagen en Firestore
+          userAvatar = userData['photoURL'];
+        }
+        if (userData?.['displayName']) { // Si tienes un displayName en Firestore
+          userName = userData['displayName'];
+        } else if (userData?.['name']) { // Si usas 'name' en lugar de 'displayName'
+          userName = userData['name'];
+        }
+      }
+    } catch (error) {
+      console.error('Error al obtener el avatar del usuario para el comentario:', error);
+    }
+    // --- FIN DE LA NUEVA LÓGICA ---
+
     const commentData: Omit<Comment, 'id'> = {
       postId,
       userId: user.uid,
       userEmail: user.email || '',
-      userName: user.displayName || user.email?.split('@')[0] || 'Usuario',
-      userAvatar: user.photoURL || '',
+      userName: userName, // Usa el userName obtenido de Firestore o el predeterminado
+      userAvatar: userAvatar || undefined, // <-- Asigna el userAvatar aquí
       content: commentContent,
       timestamp: serverTimestamp()
     };
@@ -136,17 +187,17 @@ export class SocialService {
   async getComments(postId: string): Promise<Comment[]> {
     const commentsRef = collection(this.firestore, 'comments');
     const q = query(
-      commentsRef, 
-      where('postId', '==', postId), 
+      commentsRef,
+      where('postId', '==', postId),
       orderBy('timestamp', 'desc')
     );
-    
+
     const snapshot = await getDocs(q);
     const comments: Comment[] = [];
     snapshot.forEach((doc) => {
       comments.push({ id: doc.id, ...doc.data() } as Comment);
     });
-    
+
     return comments;
   }
 
@@ -160,8 +211,16 @@ export class SocialService {
     // Eliminar imagen de Storage si existe
     if (post.imageBase64) {
       try {
-        const imageRef = ref(this.storage, post.imageBase64);
-        await deleteObject(imageRef);
+        // Asegúrate de que el imageBase64 guardado en Firestore sea el path de Storage si lo subes a Storage
+        // Si imageBase64 es un Data URL, no se elimina de Storage con este método.
+        // Si lo subes a Storage, deberías guardar la URL de descarga o una referencia al path de Storage.
+        // Asumiendo que `post.imageBase64` puede ser una URL de descarga de Storage o un Data URL.
+        // Si es un Data URL (base64 embebido), no hay nada que borrar de Storage.
+        // Solo intentamos borrar si parece una URL de Storage (ej. empieza con 'gs://' o 'https://firebasestorage...')
+        if (post.imageBase64.startsWith('gs://') || post.imageBase64.startsWith('https://firebasestorage')) {
+          const imageRef = ref(this.storage, post.imageBase64);
+          await deleteObject(imageRef);
+        }
       } catch (error) {
         console.error('Error deleting image from storage:', error);
       }
