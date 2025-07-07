@@ -48,6 +48,14 @@
         font-size: 16px;
         color: var(--ion-color-primary);
       }
+
+      // --- NUEVO ESTILO AÑADIDO PARA EL ESTADO CANCELADO ---
+      .estado-cancelado {
+        color: var(--ion-color-danger); // Usa la variable de color 'danger' de Ionic (rojo)
+        font-weight: bold; // Hace el texto en negrita
+        font-size: 0.9em; // Ligeramente más pequeño que la hora principal
+      }
+      // --- FIN NUEVO ESTILO ---
     }
     
     .acciones {

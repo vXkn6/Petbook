@@ -11,7 +11,6 @@
     </ion-toolbar>
   </ion-header>
 
-  <!-- Selector de fecha -->
   <ion-card>
     <ion-card-header>
       <ion-card-title>Seleccionar Fecha</ion-card-title>
@@ -29,7 +28,6 @@
     </ion-card-content>
   </ion-card>
 
-  <!-- Información de fecha seleccionada -->
   <ion-item>
     <ion-icon name="calendar" slot="start" color="primary"></ion-icon>
     <ion-label>
@@ -38,14 +36,12 @@
     </ion-label>
   </ion-item>
 
-  <!-- Botón para crear recordatorio -->
   <ion-fab vertical="bottom" horizontal="end" slot="fixed">
     <ion-fab-button (click)="crearRecordatorio()" color="primary">
       <ion-icon name="add"></ion-icon>
     </ion-fab-button>
   </ion-fab>
 
-  <!-- Lista de recordatorios -->
   <div class="recordatorios-container">
     <ion-card *ngIf="recordatoriosFiltrados.length === 0" class="empty-state">
       <ion-card-content class="ion-text-center">
@@ -61,22 +57,24 @@
           <div class="tiempo-info">
             <ion-icon name="time-outline" color="primary"></ion-icon>
             <span class="hora">{{ formatearHora(recordatorio.hora) }}</span>
-            
+            <span *ngIf="recordatorio.estadoCita === 'cancelada'" class="estado-cancelado">
+              (CANCELADA)
+            </span>
           </div>
           <div class="acciones">
             <ion-button 
               fill="clear" 
               size="small" 
               (click)="editarRecordatorio(recordatorio)"
-              color="medium">
-              <ion-icon name="create-outline"></ion-icon>
+              color="medium"
+              [disabled]="recordatorio.estadoCita === 'cancelada'"> <ion-icon name="create-outline"></ion-icon>
             </ion-button>
             <ion-button 
               fill="clear" 
               size="small" 
               (click)="eliminarRecordatorio(recordatorio)"
-              color="danger">
-              <ion-icon name="trash-outline"></ion-icon>
+              color="danger"
+              [disabled]="recordatorio.estadoCita === 'cancelada'"> <ion-icon name="trash-outline"></ion-icon>
             </ion-button>
           </div>
         </div>
@@ -84,9 +82,13 @@
       <ion-card-content>
         <p class="descripcion">{{ recordatorio.descripcion }}</p>
         <div class="recordatorio-info">
-          <ion-chip color="primary" outline="true">
+          <ion-chip 
+            [color]="recordatorio.estadoCita === 'cancelada' ? 'danger' : 'primary'" 
+            outline="true">
             <ion-icon name="notifications-outline"></ion-icon>
-            <ion-label>Notificación programada</ion-label>
+            <ion-label>
+              {{ recordatorio.estadoCita === 'cancelada' ? 'Cita Cancelada' : 'Notificación programada' }}
+            </ion-label>
           </ion-chip>
         </div>
       </ion-card-content>
