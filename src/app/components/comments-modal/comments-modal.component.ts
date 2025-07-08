@@ -1,6 +1,5 @@
-// src/app/components/comments-modal/comments-modal.component.ts
 import { Component, Input, OnInit, inject } from '@angular/core';
-import { ModalController, IonicModule } from '@ionic/angular';
+import { ModalController, IonicModule, ActionSheetController } from '@ionic/angular';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { SocialService } from '../../services/social.service';
@@ -11,7 +10,7 @@ import { Post, Comment } from '../../models/post.model';
   template: `
     <ion-header>
       <ion-toolbar>
-        <ion-title>Comentarios ({{ comments.length }})</ion-title>
+        <ion-title>Comentarios ({{ comments.length + totalReplies }})</ion-title>
         <ion-buttons slot="end">
           <ion-button (click)="dismiss()">
             <ion-icon name="close-outline"></ion-icon>
@@ -33,8 +32,54 @@ import { Post, Comment } from '../../models/post.model';
               <strong>{{ comment.userName }}</strong>
               <span class="comment-time">{{ formatTime(comment.timestamp) }}</span>
             </div>
+            <ion-button *ngIf="isUserComment(comment)" fill="clear" (click)="showCommentOptions(comment)">
+              <ion-icon name="ellipsis-vertical-outline"></ion-icon>
+            </ion-button>
           </div>
           <p class="comment-content">{{ comment.content }}</p>
+
+          <ion-button fill="clear" size="small" (click)="toggleReply(comment)">
+            <ion-icon name="arrow-undo-outline" slot="start"></ion-icon>
+            Responder
+          </ion-button>
+
+          <div class="reply-area" *ngIf="replyingTo === comment.id">
+            <ion-textarea
+              [(ngModel)]="replyContent"
+              placeholder="Escribe tu respuesta..."
+              rows="2"
+              maxlength="500"
+            ></ion-textarea>
+            <ion-button 
+              fill="clear" 
+              size="small" 
+              (click)="addReply(comment)"
+              [disabled]="!replyContent?.trim() || isLoading"
+            >
+              <ion-icon name="send" *ngIf="!isLoading"></ion-icon>
+              <ion-spinner name="crescent" *ngIf="isLoading"></ion-spinner>
+            </ion-button>
+          </div>
+
+          <div class="replies-container" *ngIf="comment.replies && comment.replies.length > 0">
+            <div class="reply-item" *ngFor="let reply of comment.replies">
+              <div class="reply-header">
+                <img 
+                  [src]="reply.userAvatar || 'https://ionicframework.com/docs/img/demos/avatar.svg'" 
+                  alt="Avatar" 
+                  class="reply-avatar"
+                >
+                <div class="reply-info">
+                  <strong>{{ reply.userName }}</strong>
+                  <span class="reply-time">{{ formatTime(reply.timestamp) }}</span>
+                </div>
+                <ion-button *ngIf="isUserComment(reply)" fill="clear" (click)="showCommentOptions(reply)">
+                  <ion-icon name="ellipsis-vertical-outline"></ion-icon>
+                </ion-button>
+              </div>
+              <p class="reply-content">{{ reply.content }}</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -78,11 +123,6 @@ import { Post, Comment } from '../../models/post.model';
       border-bottom: 1px solid rgba(0, 0, 0, 0.1);
     }
 
-    .comment-item:last-child {
-      border-bottom: none;
-      margin-bottom: 0;
-    }
-
     .comment-header {
       display: flex;
       align-items: center;
@@ -119,6 +159,64 @@ import { Post, Comment } from '../../models/post.model';
       padding-left: 44px;
     }
 
+    .reply-area {
+      padding-left: 44px;
+      margin-top: 8px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .replies-container {
+      margin-left: 44px;
+      margin-top: 8px;
+      border-left: 2px solid var(--ion-color-light);
+      padding-left: 8px;
+    }
+
+    .reply-item {
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .reply-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .reply-avatar {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .reply-info {
+      flex: 1;
+    }
+
+    .reply-info strong {
+      display: block;
+      font-size: 0.9em;
+      font-weight: 500;
+      color: var(--ion-color-dark);
+    }
+
+    .reply-time {
+      font-size: 0.7em;
+      color: var(--ion-color-medium);
+    }
+
+    .reply-content {
+      margin: 0;
+      color: var(--ion-color-dark);
+      line-height: 1.4;
+      padding-left: 32px;
+      font-size: 0.9em;
+    }
+
     .no-comments {
       text-align: center;
       padding: 40px 20px;
@@ -149,16 +247,38 @@ import { Post, Comment } from '../../models/post.model';
 })
 export class CommentsModalComponent implements OnInit {
   @Input() post!: Post;
-  @Input() comments: Comment[] = [];
+  comments: Comment[] = [];
+  totalReplies = 0;
   
-  newComment = '';
+  newComment: string = ''; // Inicializado como string vacío
+  replyContent: string = ''; // Inicializado como string vacío
+  replyingTo: string | null = null; // Acepta string o null
   isLoading = false;
   
   private modalController = inject(ModalController);
   private socialService = inject(SocialService);
+  private actionSheetController = inject(ActionSheetController);
 
-  ngOnInit() {
-    // Inicialización si es necesaria
+  async ngOnInit() {
+    this.loadComments();
+  }
+
+  async loadComments() {
+    this.isLoading = true;
+    try {
+      this.comments = await this.socialService.getCommentsWithReplies(this.post.id!);
+      this.calculateTotalReplies();
+    } catch (error) {
+      console.error('Error al cargar comentarios:', error);
+    } finally {
+      this.isLoading = false;
+    }
+  }
+
+  calculateTotalReplies() {
+    this.totalReplies = this.comments.reduce((total, comment) => {
+      return total + (comment.replies ? comment.replies.length : 0);
+    }, 0);
   }
 
   async addComment() {
@@ -168,15 +288,69 @@ export class CommentsModalComponent implements OnInit {
     
     try {
       await this.socialService.addComment(this.post.id!, this.newComment);
-      
-      // Recargar comentarios
-      this.comments = await this.socialService.getComments(this.post.id!);
       this.newComment = '';
-      
+      await this.loadComments();
     } catch (error) {
       console.error('Error al agregar comentario:', error);
     } finally {
       this.isLoading = false;
+    }
+  }
+
+  toggleReply(comment: Comment) {
+  if (comment.id === undefined) return;
+  this.replyingTo = this.replyingTo === comment.id ? null : comment.id;
+  this.replyContent = '';
+}
+  async addReply(comment: Comment) {
+    if (!this.replyContent.trim() || this.isLoading) return;
+
+    this.isLoading = true;
+    
+    try {
+      await this.socialService.addReply(this.post.id!, comment.id!, this.replyContent);
+      this.replyingTo = null;
+      this.replyContent = '';
+      await this.loadComments();
+    } catch (error) {
+      console.error('Error al agregar respuesta:', error);
+    } finally {
+      this.isLoading = false;
+    }
+  }
+
+  isUserComment(comment: Comment): boolean {
+    return this.socialService.isUserComment(comment);
+  }
+
+  async showCommentOptions(comment: Comment) {
+    const actionSheet = await this.actionSheetController.create({
+      header: 'Opciones del comentario',
+      buttons: [
+        {
+          text: 'Eliminar',
+          icon: 'trash-outline',
+          role: 'destructive',
+          handler: () => {
+            this.deleteComment(comment);
+          }
+        },
+        {
+          text: 'Cancelar',
+          icon: 'close-outline',
+          role: 'cancel'
+        }
+      ]
+    });
+    await actionSheet.present();
+  }
+
+  async deleteComment(comment: Comment) {
+    try {
+      await this.socialService.deleteComment(comment.id!, this.post.id!);
+      await this.loadComments();
+    } catch (error) {
+      console.error('Error al eliminar comentario:', error);
     }
   }
 

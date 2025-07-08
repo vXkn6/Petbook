@@ -20,4 +20,6 @@ export interface Comment {
   userAvatar?: string;
   content: string;
   timestamp: any; 
+  parentCommentId?: string; // Nuevo campo para comentarios anidados
+  replies?: Comment[];     // Array para almacenar respuestas
 }

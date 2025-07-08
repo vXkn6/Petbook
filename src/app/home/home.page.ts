@@ -8,7 +8,7 @@ import { addIcons } from 'ionicons';
 import {
   logOutOutline, personCircleOutline, cameraOutline,
   imagesOutline, heartOutline, heart, chatbubbleOutline, chatbubbleEllipsesOutline,
-  ellipsisVerticalOutline, trashOutline, closeOutline, personOutline, pawOutline, calendarOutline, medicalOutline, chatbubblesOutline, send, sync, add, clipboardOutline, barChartOutline // Asegúrate de que todos los iconos usados en HTML estén aquí
+  ellipsisVerticalOutline, trashOutline, closeOutline, personOutline, pawOutline, calendarOutline, medicalOutline, chatbubblesOutline, send, sync, add, clipboardOutline, barChartOutline , arrowUndoOutline // Asegúrate de que todos los iconos usados en HTML estén aquí
 } from 'ionicons/icons';
 import { Router } from '@angular/router';
 import { RouterModule } from '@angular/router';
@@ -59,12 +59,12 @@ export class HomePage implements OnInit {
   private localImagePaths: { [postId: string]: string } = {};
 
   constructor() {
-    addIcons({
-      personCircleOutline, personOutline, pawOutline, calendarOutline, medicalOutline, chatbubblesOutline,
-      logOutOutline, closeOutline, cameraOutline, send, sync, ellipsisVerticalOutline,
-      chatbubbleOutline, chatbubbleEllipsesOutline, add, imagesOutline, heartOutline, heart, trashOutline,
-      clipboardOutline, barChartOutline // Asegúrate de agregar los iconos nuevos si los usas en tu HTML
-    });
+  addIcons({
+    personCircleOutline, personOutline, pawOutline, calendarOutline, medicalOutline, chatbubblesOutline,
+    logOutOutline, closeOutline, cameraOutline, send, sync, ellipsisVerticalOutline,
+    chatbubbleOutline, chatbubbleEllipsesOutline, add, imagesOutline, heartOutline, heart, trashOutline,
+    clipboardOutline, barChartOutline 
+  });
 
     // Inicializar posts observable si el servicio existe
     if (this.socialService) {
