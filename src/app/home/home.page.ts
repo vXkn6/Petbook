@@ -1,25 +1,21 @@
-// home.page.ts
-
-import { Component, OnInit, inject, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnInit, inject, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { IonicModule, ActionSheetController, AlertController, IonTextarea, MenuController, ModalController } from '@ionic/angular';
 import { CommonModule } from '@angular/common';
 import { addIcons } from 'ionicons';
 import {
   logOutOutline, personCircleOutline, cameraOutline,
-  imagesOutline, heartOutline, heart, chatbubbleOutline, chatbubbleEllipsesOutline,
-  ellipsisVerticalOutline, trashOutline, closeOutline, personOutline, pawOutline, calendarOutline, medicalOutline, chatbubblesOutline, send, sync, add, clipboardOutline, barChartOutline , arrowUndoOutline // Asegúrate de que todos los iconos usados en HTML estén aquí
+  imagesOutline, heartOutline, heart, chatbubbleOutline,
+  ellipsisVerticalOutline, trashOutline, closeOutline, personOutline, pawOutline, calendarOutline,
+  medicalOutline, chatbubblesOutline, send, sync, clipboardOutline, barChartOutline
 } from 'ionicons/icons';
 import { Router } from '@angular/router';
-import { RouterModule } from '@angular/router';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
 import { AutheticationService } from '../services/authetication.service';
 import { SocialService } from '../services/social.service';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Post, Comment } from '../models/post.model';
 import { Observable } from 'rxjs';
-import { Filesystem, Directory } from '@capacitor/filesystem';
-import { Capacitor } from '@capacitor/core';
 import Compressor from 'compressorjs';
 import { CommentsModalComponent } from '../components/comments-modal/comments-modal.component';
 
@@ -30,25 +26,23 @@ import { CommentsModalComponent } from '../components/comments-modal/comments-mo
   standalone: false,
 })
 export class HomePage implements OnInit {
-  // Propiedades del usuario
   userEmail: string | null = null;
   userRole: string | null = null;
   userName: string | null = null;
   userPhotoURL: string | null = null;
   currentUser: any = null;
 
-  // Propiedades de la red social
   posts$: Observable<Post[]>;
   newPostContent = '';
   selectedImageBase64: string | undefined = undefined;
   selectedImagePreview: string | undefined = undefined;
+  selectedPetType: 'dog' | 'cat' | 'other' = 'other';
+  currentFilter: 'dog' | 'cat' | null = null;
 
   isLoading = false;
 
-  // Referencia al ion-textarea para poder enfocarlo
   @ViewChild('postTextarea') postTextarea!: IonTextarea;
 
-  // Servicios inyectados
   private authService = inject(AutheticationService);
   private socialService = inject(SocialService);
   private router = inject(Router);
@@ -56,39 +50,43 @@ export class HomePage implements OnInit {
   private alertController = inject(AlertController);
   private menuCtrl = inject(MenuController);
   private modalController = inject(ModalController);
-  private localImagePaths: { [postId: string]: string } = {};
 
   constructor() {
-  addIcons({
-    personCircleOutline, personOutline, pawOutline, calendarOutline, medicalOutline, chatbubblesOutline,
-    logOutOutline, closeOutline, cameraOutline, send, sync, ellipsisVerticalOutline,
-    chatbubbleOutline, chatbubbleEllipsesOutline, add, imagesOutline, heartOutline, heart, trashOutline,
-    clipboardOutline, barChartOutline 
-  });
+    addIcons({
+      personCircleOutline, personOutline, pawOutline, calendarOutline, medicalOutline, chatbubblesOutline,
+      logOutOutline, closeOutline, cameraOutline, send, sync, ellipsisVerticalOutline,
+      chatbubbleOutline, heartOutline, heart, trashOutline, clipboardOutline, barChartOutline
+    });
 
-    // Inicializar posts observable si el servicio existe
-    if (this.socialService) {
-      this.posts$ = this.socialService.posts$;
-    } else {
-      // Crear un observable vacío como fallback
-      this.posts$ = new Observable<Post[]>(observer => {
-        observer.next([]);
-      });
-    }
+    this.posts$ = this.socialService.posts$;
   }
 
   async ngOnInit() {
-    // Verificar autenticación
+    // Verificar autenticación y cargar datos
+    await this.loadUserData();
+
+    // Escuchar cambios de autenticación
+    this.authService.currentUser$.subscribe(async (user) => {
+      if (user) {
+        await this.loadUserData();
+      } else {
+        // Limpiar datos si no hay usuario
+        this.clearUserData();
+        this.router.navigate(['/login']);
+      }
+    });
+  }
+
+  private async loadUserData() {
     const user = this.authService.getCurrentUser();
     if (!user) {
-      this.router.navigate(['/login']);
+      this.clearUserData();
       return;
     }
 
     this.currentUser = user;
     this.userEmail = user.email;
 
-    // Obtener datos adicionales del usuario desde Firestore
     try {
       const db = getFirestore();
       const userDoc = await getDoc(doc(db, 'users', user.uid));
@@ -104,7 +102,14 @@ export class HomePage implements OnInit {
     }
   }
 
-  // Función para obtener la URL de la foto del usuario
+  private clearUserData() {
+    this.userEmail = null;
+    this.userRole = null;
+    this.userName = null;
+    this.userPhotoURL = null;
+    this.currentUser = null;
+  }
+
   getUserPhoto(): string {
     return this.userPhotoURL || 'https://ionicframework.com/docs/img/demos/avatar.svg';
   }
@@ -115,7 +120,6 @@ export class HomePage implements OnInit {
     }
   }
 
-  // Métodos de autenticación
   async logout() {
     const alert = await this.alertController.create({
       header: 'Cerrar Sesión',
@@ -130,7 +134,18 @@ export class HomePage implements OnInit {
           handler: async () => {
             try {
               await this.authService.logout();
+              // Limpiar los datos locales
+              this.userEmail = null;
+              this.userRole = null;
+              this.userName = null;
+              this.userPhotoURL = null;
+              this.currentUser = null;
+
+              // Cerrar el menú
               await this.menuCtrl.close('main-menu');
+
+              // Redirigir al login
+              this.router.navigate(['/login']);
             } catch (error) {
               console.error('Error al cerrar sesión:', error);
             }
@@ -141,7 +156,6 @@ export class HomePage implements OnInit {
     await alert.present();
   }
 
-  // Métodos de la red social
   async selectImage() {
     const actionSheet = await this.actionSheetController.create({
       header: 'Seleccionar Imagen',
@@ -194,7 +208,6 @@ export class HomePage implements OnInit {
 
   private async compressImage(base64: string): Promise<string> {
     const blob = this.base64ToBlob(base64);
-
     const compressedBlob = await new Promise<Blob>((resolve, reject) => {
       new Compressor(blob, {
         quality: 0.7,
@@ -204,7 +217,6 @@ export class HomePage implements OnInit {
         error: reject
       });
     });
-
     return this.blobToBase64(compressedBlob);
   }
 
@@ -222,20 +234,21 @@ export class HomePage implements OnInit {
   private base64ToBlob(base64: string, contentType = 'image/jpeg'): Blob {
     const byteCharacters = atob(base64);
     const byteArrays = [];
-
     for (let offset = 0; offset < byteCharacters.length; offset += 512) {
       const slice = byteCharacters.slice(offset, offset + 512);
       const byteNumbers = new Array(slice.length);
-
       for (let i = 0; i < slice.length; i++) {
         byteNumbers[i] = slice.charCodeAt(i);
       }
-
       const byteArray = new Uint8Array(byteNumbers);
       byteArrays.push(byteArray);
     }
-
     return new Blob(byteArrays, { type: contentType });
+  }
+
+  setFilter(petType: 'dog' | 'cat' | null) {
+    this.currentFilter = petType;
+    this.socialService.setFilter(petType);
   }
 
   async createPost() {
@@ -249,7 +262,8 @@ export class HomePage implements OnInit {
     try {
       await this.socialService.createPost(
         this.newPostContent,
-        this.selectedImageBase64
+        this.selectedImageBase64,
+        this.selectedPetType
       );
 
       this.resetPostForm();
@@ -268,18 +282,12 @@ export class HomePage implements OnInit {
     this.selectedImagePreview = undefined;
   }
 
-  getPostImage(post: Post): string | null | undefined {
-    return post.imageBase64;
-  }
-
   removeSelectedImage() {
     this.selectedImageBase64 = undefined;
     this.selectedImagePreview = undefined;
   }
 
   async toggleLike(postId: string) {
-    if (!this.socialService) return;
-
     try {
       await this.socialService.toggleLike(postId);
     } catch (error) {
@@ -289,21 +297,17 @@ export class HomePage implements OnInit {
   }
 
   hasUserLiked(post: Post): boolean {
-    if (!this.socialService) return false;
     return this.socialService.hasUserLiked(post);
   }
 
   isUserPost(post: Post): boolean {
-    if (!this.socialService) return false;
     return this.socialService.isUserPost(post);
   }
 
   async showComments(post: Post) {
-    if (!this.socialService) return;
-
     try {
       const comments = await this.socialService.getComments(post.id!);
-      
+
       const modal = await this.modalController.create({
         component: CommentsModalComponent,
         componentProps: {
@@ -315,7 +319,6 @@ export class HomePage implements OnInit {
 
       modal.onDidDismiss().then((result) => {
         if (result.data?.newComment) {
-          // Actualizar la lista de comentarios si se agregó uno nuevo
           this.showToast('Comentario agregado', 'success');
         }
       });
@@ -352,8 +355,6 @@ export class HomePage implements OnInit {
   }
 
   async confirmDeletePost(post: Post) {
-    if (!this.socialService) return;
-
     const alert = await this.alertController.create({
       header: 'Confirmar eliminación',
       message: '¿Estás seguro de que quieres eliminar esta publicación? Esta acción no se puede deshacer.',
@@ -379,10 +380,8 @@ export class HomePage implements OnInit {
     await alert.present();
   }
 
-  // Métodos utilitarios
   formatTime(timestamp: any): string {
     if (!timestamp) return '';
-
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -411,7 +410,6 @@ export class HomePage implements OnInit {
     toast.duration = 2000;
     toast.color = color;
     toast.position = 'bottom';
-
     document.body.appendChild(toast);
     return toast.present();
   }

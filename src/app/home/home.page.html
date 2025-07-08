@@ -118,6 +118,29 @@
       </ion-card-content>
     </ion-card>
 
+    <!-- Community Filter Card -->
+    <ion-card>
+      <ion-card-header>
+        <ion-card-title>Comunidad</ion-card-title>
+        <ion-card-subtitle>Filtra publicaciones por tipo de mascota</ion-card-subtitle>
+      </ion-card-header>
+      <ion-card-content>
+        <ion-segment [(ngModel)]="currentFilter" (ionChange)="setFilter(currentFilter)" color="primary">
+          <ion-segment-button [value]="null">
+            <ion-label>Todos</ion-label>
+          </ion-segment-button>
+          <ion-segment-button value="dog">
+            <ion-label>Perros</ion-label>
+            <ion-icon name="paw-outline"></ion-icon>
+          </ion-segment-button>
+          <ion-segment-button value="cat">
+            <ion-label>Gatos</ion-label>
+            <ion-icon name="paw-outline"></ion-icon>
+          </ion-segment-button>
+        </ion-segment>
+      </ion-card-content>
+    </ion-card>
+
     <ion-card>
       <ion-card-header>
         <ion-card-title>¿Qué hace tu mascota hoy?</ion-card-title>
@@ -127,6 +150,21 @@
         <ion-textarea [(ngModel)]="newPostContent" placeholder="Cuéntanos sobre tu mascota..." rows="3" maxlength="500"
           counter="true" #postTextarea>
         </ion-textarea>
+
+        <ion-segment [(ngModel)]="selectedPetType" color="primary" class="pet-type-segment">
+          <ion-segment-button value="dog">
+            <ion-label>Perro</ion-label>
+            <ion-icon name="paw-outline"></ion-icon>
+          </ion-segment-button>
+          <ion-segment-button value="cat">
+            <ion-label>Gato</ion-label>
+            <ion-icon name="paw-outline"></ion-icon>
+          </ion-segment-button>
+          <ion-segment-button value="other">
+            <ion-label>Otro</ion-label>
+            <ion-icon name="paw-outline"></ion-icon>
+          </ion-segment-button>
+        </ion-segment>
 
         <div *ngIf="selectedImagePreview" class="image-preview">
           <ion-img *ngIf="selectedImagePreview" [src]="selectedImagePreview" alt="Preview"></ion-img>
@@ -160,7 +198,12 @@
                 <img [src]="post.userAvatar || 'https://ionicframework.com/docs/img/demos/avatar.svg'" alt="Foto de perfil del autor">
               </ion-avatar>
               <div class="user-details">
-                <ion-card-title>{{ post.userName }}</ion-card-title>
+                <ion-card-title>
+                  {{ post.userName }}
+                  <span *ngIf="post.petType" class="pet-type-indicator" [ngClass]="post.petType">
+                    {{ post.petType === 'dog' ? 'Perro' : post.petType === 'cat' ? 'Gato' : 'Otro' }}
+                  </span>
+                </ion-card-title>
                 <ion-card-subtitle>{{ formatTime(post.timestamp) }}</ion-card-subtitle>
               </div>
             </div>

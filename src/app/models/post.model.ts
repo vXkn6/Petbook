@@ -10,7 +10,9 @@ export interface Post {
   likes: string[]; 
   likesCount: number;
   commentsCount: number;
+  petType?: 'dog' | 'cat' | 'other'; // Added petType field
 }
+
 export interface Comment {
   id?: string;
   postId: string;
@@ -20,6 +22,6 @@ export interface Comment {
   userAvatar?: string;
   content: string;
   timestamp: any; 
-  parentCommentId?: string; // Nuevo campo para comentarios anidados
-  replies?: Comment[];     // Array para almacenar respuestas
+  parentCommentId?: string;
+  replies?: Comment[];
 }
