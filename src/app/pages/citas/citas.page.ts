@@ -6,6 +6,8 @@ import { CommonModule } from '@angular/common';
 import { AutheticationService } from 'src/app/services/authetication.service';
 import { Cita } from 'src/app/models/cita.model';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { environment } from 'src/environments/environment';
+import { HttpClient } from '@angular/common/http';
 
 interface Pet {
   id: string;
@@ -71,7 +73,8 @@ export class CitasPage implements OnInit {
     private firestore: Firestore,
     private toastController: ToastController,
     private authService: AutheticationService,
-    private alertController: AlertController
+    private alertController: AlertController,
+    private http: HttpClient,
   ) { }
 
   async ngOnInit(): Promise<void> {
@@ -640,39 +643,39 @@ export class CitasPage implements OnInit {
 
   // --- MÉTODO PARA ACTUALIZAR ESTADO DE RECORDATORIO CANCELADO ---
   private async actualizarEstadoRecordatorioCancelado(citaId: string, motivoCancelacion: string): Promise<void> {
-      try {
-          if (!citaId) {
-              console.error('ID de cita no disponible para actualizar recordatorio de cancelación.');
-              return;
-          }
-
-          const recordatoriosRef = collection(this.firestore, 'recordatorios');
-          const q = query(recordatoriosRef, where('citaId', '==', citaId));
-          const querySnapshot = await getDocs(q);
-
-          if (!querySnapshot.empty) {
-              const recordatorioDoc = querySnapshot.docs[0];
-              const recordatorioId = recordatorioDoc.id;
-              const recordatorioData = recordatorioDoc.data();
-
-              // *** Se añade "CANCELADA" y el motivo a la descripción existente ***
-              const nuevaDescripcion = `${recordatorioData['descripcion']} (CANCELADA - Motivo: ${motivoCancelacion})`;
-
-              await updateDoc(doc(this.firestore, 'recordatorios', recordatorioId), {
-                  descripcion: nuevaDescripcion,
-                  estadoCita: 'cancelada' // *** Se establece el estado a 'cancelada' ***
-              });
-
-              // Opcional: Cancelar la notificación original si ya no es relevante
-              if (recordatorioData['notificationId'] !== undefined) {
-                  await LocalNotifications.cancel({ notifications: [{ id: recordatorioData['notificationId'] }] });
-              }
-          } else {
-              console.warn(`No se encontró recordatorio asociado a la cita ${citaId} para actualizar su estado de cancelación.`);
-          }
-      } catch (error) {
-          console.error('Error al actualizar el estado del recordatorio por cancelación:', error);
+    try {
+      if (!citaId) {
+        console.error('ID de cita no disponible para actualizar recordatorio de cancelación.');
+        return;
       }
+
+      const recordatoriosRef = collection(this.firestore, 'recordatorios');
+      const q = query(recordatoriosRef, where('citaId', '==', citaId));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        const recordatorioDoc = querySnapshot.docs[0];
+        const recordatorioId = recordatorioDoc.id;
+        const recordatorioData = recordatorioDoc.data();
+
+        // *** Se añade "CANCELADA" y el motivo a la descripción existente ***
+        const nuevaDescripcion = `${recordatorioData['descripcion']} (CANCELADA - Motivo: ${motivoCancelacion})`;
+
+        await updateDoc(doc(this.firestore, 'recordatorios', recordatorioId), {
+          descripcion: nuevaDescripcion,
+          estadoCita: 'cancelada' // *** Se establece el estado a 'cancelada' ***
+        });
+
+        // Opcional: Cancelar la notificación original si ya no es relevante
+        if (recordatorioData['notificationId'] !== undefined) {
+          await LocalNotifications.cancel({ notifications: [{ id: recordatorioData['notificationId'] }] });
+        }
+      } else {
+        console.warn(`No se encontró recordatorio asociado a la cita ${citaId} para actualizar su estado de cancelación.`);
+      }
+    } catch (error) {
+      console.error('Error al actualizar el estado del recordatorio por cancelación:', error);
+    }
   }
 
   // Se mantiene `eliminarRecordatorioCalendario` para otros usos si fuera necesario,
@@ -768,9 +771,16 @@ export class CitasPage implements OnInit {
                   motivoCancelacion: data.motivo
                 });
 
-                // *** CAMBIADO: Ahora llama a actualizarEstadoRecordatorioCancelado ***
+                // Actualizar recordatorio
                 await this.actualizarEstadoRecordatorioCancelado(cita.id, data.motivo);
+
+                // Notificación local (dispositivo)
                 await this.programarNotificacionCancelacion(cita, data.motivo);
+
+                // Notificación push (OneSignal)
+                if (cita.userId) {
+                  this.enviarNotificacionCancelacion(cita.userId, cita, data.motivo);
+                }
 
                 this.mostrarToast('Cita cancelada correctamente y usuario notificado.', 'success');
                 this.cerrarModal();
@@ -811,6 +821,29 @@ export class CitasPage implements OnInit {
       console.error('Error al actualizar cita:', error);
       this.mostrarToast('Error al actualizar la cita', 'danger');
     }
+  }
+
+  enviarNotificacionCancelacion(userId: string, cita: any, motivo: string) {
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': environment.onesignal.restApiKey
+    };
+
+    const body = {
+      app_id: environment.onesignal.appId,
+      include_external_user_ids: [userId],
+      channel_for_external_user_ids: 'push',
+      headings: { en: 'Cita cancelada' },
+      contents: {
+        en: `Tu cita del ${cita.fecha} a las ${cita.hora} fue cancelada por la Veterinaria .\nMotivo: ${motivo}`
+      }
+    };
+
+    this.http.post('https://onesignal.com/api/v1/notifications', body, { headers })
+      .subscribe({
+        next: () => console.log('✅ Notificación enviada'),
+        error: (err) => console.error('❌ Error al enviar notificación', err)
+      });
   }
 
   async debugInfo(): Promise<void> {

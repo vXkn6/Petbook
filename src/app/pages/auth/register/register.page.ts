@@ -26,7 +26,8 @@ registerForm: FormGroup;
     this.registerForm = this.fb.group({
       email: ['', [Validators.required, Validators.email]],
       password: ['', [Validators.required, Validators.minLength(6)]],
-      confirmPassword: ['', [Validators.required]]
+      confirmPassword: ['', [Validators.required]],
+      username: ['', [Validators.required, Validators.minLength(3)]],
     }, { 
       validators: this.passwordMatchValidator
     });
@@ -53,13 +54,13 @@ registerForm: FormGroup;
       await loading.present();
 
       try {
-        const { email, password } = this.registerForm.value;
+        const { email, password, username } = this.registerForm.value;
         // La llamada a register ahora devuelve el UserCredential
         const userCredential = await this.authService.register(email, password);
 
         // --- Guardar datos adicionales en Firestore ---
         if (userCredential.user) {
-          await this.authService.saveUserData(userCredential.user.uid, userCredential.user.email || email);
+          await this.authService.saveUserData(userCredential.user.uid, userCredential.user.email || email, username);
         }
         // ----------------------------------------------
 
